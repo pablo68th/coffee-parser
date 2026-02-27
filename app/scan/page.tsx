@@ -39,17 +39,18 @@ export default function ScanPage() {
           });
 
           if (!res.ok) {
-            const j = await res.json().catch(() => ({}));
-            let msg = "No se pudo bajar el PDF";
-try {
-  const j = await res.json();
-  if (j?.error) msg = j.error;
-} catch {
-  const t = await res.text().catch(() => "");
-  if (t) msg = t.slice(0, 200);
+  const raw = await res.text().catch(() => "");
+  let msg = "No se pudo bajar el PDF";
+
+  try {
+    const j = JSON.parse(raw);
+    if (j?.error) msg = j.error;
+  } catch {
+    if (raw) msg = raw.slice(0, 200);
+  }
+
+  throw new Error(msg);
 }
-throw new Error(msg);
-          }
 
           const filename = res.headers.get("x-filename") || "qr.pdf";
           const blob = await res.blob();
