@@ -1,5 +1,48 @@
 import { NextResponse } from "next/server";
 
+function looksLikePdf(bytes: Uint8Array) {
+  // Un PDF casi siempre empieza con: %PDF-
+  const head = new TextDecoder().decode(bytes.slice(0, 5));
+  return head === "%PDF-";
+}
+
+function pickFilenameFromHeadersOrUrl(cd: string, url: string) {
+  const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';\n]+)["']?/i);
+  if (match?.[1]) {
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return match[1];
+    }
+  }
+  try {
+    const u = new URL(url);
+    const last = u.pathname.split("/").pop() || "qr.pdf";
+    return last.toLowerCase().endsWith(".pdf") ? last : "qr.pdf";
+  } catch {
+    return "qr.pdf";
+  }
+}
+
+// Si el QR apunta a HTML (una página), intentamos encontrar un link .pdf dentro
+function tryFindPdfLinkInHtml(html: string, baseUrl: string) {
+  // 1) Busca cualquier URL que termine en .pdf
+  const direct = html.match(/https?:\/\/[^\s"'<>]+\.pdf(\?[^\s"'<>]+)?/i);
+  if (direct?.[0]) return direct[0];
+
+  // 2) Busca href="/algo.pdf" relativo
+  const href = html.match(/href=["']([^"']+\.pdf(\?[^"']+)?)["']/i);
+  if (href?.[1]) {
+    try {
+      return new URL(href[1], baseUrl).toString();
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
     const { url } = await req.json();
@@ -8,45 +51,106 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Falta url" }, { status: 400 });
     }
 
-    // Solo permitir http/https
     if (!/^https?:\/\//i.test(url)) {
       return NextResponse.json({ error: "URL inválida" }, { status: 400 });
     }
 
-    const res = await fetch(url, { redirect: "follow" });
+    // 1) Fetch con headers tipo navegador (evita bloqueos comunes)
+    const res = await fetch(url, {
+      redirect: "follow",
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (compatible; CoffeeParser/1.0; +https://coffee-parser.vercel.app)",
+        accept:
+          "application/pdf,application/octet-stream,text/html;q=0.9,*/*;q=0.8",
+      },
+    });
 
     if (!res.ok) {
+      const ct = res.headers.get("content-type") || "";
       return NextResponse.json(
-        { error: `No se pudo descargar el PDF. Status ${res.status}` },
+        { error: `No se pudo descargar. Status ${res.status}. content-type: ${ct || "—"}` },
         { status: 400 }
       );
     }
 
-    const ct = res.headers.get("content-type") || "";
-    const isPdf = ct.includes("application/pdf") || url.toLowerCase().includes(".pdf");
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    const cd = res.headers.get("content-disposition") || "";
+    const finalUrl = res.url || url;
 
-    if (!isPdf) {
+    // 2) Si es HTML, intentamos extraer un link a PDF y reintentar
+    if (ct.includes("text/html")) {
+      const html = await res.text();
+      const pdfUrl = tryFindPdfLinkInHtml(html, finalUrl);
+
+      if (!pdfUrl) {
+        return NextResponse.json(
+          { error: "El QR lleva a una página (no PDF) y no encontré un link .pdf dentro." },
+          { status: 400 }
+        );
+      }
+
+      const res2 = await fetch(pdfUrl, {
+        redirect: "follow",
+        headers: {
+          "user-agent":
+            "Mozilla/5.0 (compatible; CoffeeParser/1.0; +https://coffee-parser.vercel.app)",
+          accept: "application/pdf,application/octet-stream,*/*",
+        },
+      });
+
+      if (!res2.ok) {
+        const ct2 = res2.headers.get("content-type") || "";
+        return NextResponse.json(
+          { error: `Encontré un link .pdf pero falló la descarga. Status ${res2.status}. content-type: ${ct2 || "—"}` },
+          { status: 400 }
+        );
+      }
+
+      const ab2 = await res2.arrayBuffer();
+      const u8 = new Uint8Array(ab2);
+
+      if (!looksLikePdf(u8)) {
+        return NextResponse.json(
+          { error: "Descargué algo pero no parece PDF válido (no inicia con %PDF-)." },
+          { status: 400 }
+        );
+      }
+
+      const cd2 = res2.headers.get("content-disposition") || "";
+      const filename2 = pickFilenameFromHeadersOrUrl(cd2, pdfUrl);
+
+      return new NextResponse(ab2, {
+        status: 200,
+        headers: {
+          "content-type": "application/pdf",
+          "x-filename": filename2,
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    // 3) Si NO dice PDF pero puede ser octet-stream, lo aceptamos si "huele" a PDF
+    const ab = await res.arrayBuffer();
+    const u8 = new Uint8Array(ab);
+
+    const isPdfByHeader = ct.includes("application/pdf");
+    const isPdfByMagic = looksLikePdf(u8);
+
+    if (!isPdfByHeader && !isPdfByMagic) {
       return NextResponse.json(
         { error: `El link no parece PDF (content-type: ${ct || "—"})` },
         { status: 400 }
       );
     }
 
-    const ab = await res.arrayBuffer();
-
-    // Límite de tamaño (ej. 12MB) para evitar cosas raras
+    // Límite de tamaño (12MB)
     const maxBytes = 12 * 1024 * 1024;
     if (ab.byteLength > maxBytes) {
-      return NextResponse.json(
-        { error: "PDF demasiado grande (máx 12MB)" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "PDF demasiado grande (máx 12MB)" }, { status: 400 });
     }
 
-    // Intento de nombre desde Content-Disposition
-    const cd = res.headers.get("content-disposition") || "";
-    const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';\n]+)["']?/i);
-    const filename = match?.[1] ? decodeURIComponent(match[1]) : "qr.pdf";
+    const filename = pickFilenameFromHeadersOrUrl(cd, finalUrl);
 
     return new NextResponse(ab, {
       status: 200,
@@ -57,9 +161,6 @@ export async function POST(req: Request) {
       },
     });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message ?? "Error inesperado" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: e?.message ?? "Error inesperado" }, { status: 500 });
   }
 }

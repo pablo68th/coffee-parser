@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Html5QrcodeScanner } from "html5-qrcode";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function ScanPage() {
   const router = useRouter();
@@ -77,12 +78,27 @@ export default function ScanPage() {
 
           // Nota: storage_path lo genera Home al subir a Storage.
           // Aquí también lo hacemos: subimos el PDF.
-          const safeName = filename
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/\s+/g, "_")
-            .replace(/[^a-zA-Z0-9._-]/g, "_");
+          const safeName = file.name
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/\s+/g, "_")
+  .replace(/[^a-zA-Z0-9._-]/g, "_");
 
+const path = `pdfs/${Date.now()}_${safeName}`;
+
+const { error: uploadError } = await supabase.storage
+  .from("coffee-pdfs")
+  .upload(path, file, { contentType: "application/pdf" });
+
+if (uploadError) {
+  // No bloqueamos (frictionless), pero avisamos
+  console.log("No se pudo subir PDF a Storage:", uploadError.message);
+} else {
+  localStorage.setItem("last_pdf_storage_path", path);
+  localStorage.setItem("last_pdf_mime", "application/pdf");
+}
+
+            
           // Necesitas tu supabase client aquí? En /scan no lo importamos.
           // Para mantenerlo simple: NO subimos aquí.
           // Peeero tú quieres guardar el PDF siempre (brief).
