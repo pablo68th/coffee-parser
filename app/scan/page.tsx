@@ -40,7 +40,15 @@ export default function ScanPage() {
 
           if (!res.ok) {
             const j = await res.json().catch(() => ({}));
-            throw new Error(j?.error ?? "No se pudo bajar el PDF");
+            let msg = "No se pudo bajar el PDF";
+try {
+  const j = await res.json();
+  if (j?.error) msg = j.error;
+} catch {
+  const t = await res.text().catch(() => "");
+  if (t) msg = t.slice(0, 200);
+}
+throw new Error(msg);
           }
 
           const filename = res.headers.get("x-filename") || "qr.pdf";

@@ -1,46 +1,32 @@
 import { NextResponse } from "next/server";
 
 function looksLikePdf(bytes: Uint8Array) {
-  // Un PDF casi siempre empieza con: %PDF-
   const head = new TextDecoder().decode(bytes.slice(0, 5));
   return head === "%PDF-";
 }
 
-function pickFilenameFromHeadersOrUrl(cd: string, url: string) {
-  const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';\n]+)["']?/i);
-  if (match?.[1]) {
-    try {
-      return decodeURIComponent(match[1]);
-    } catch {
-      return match[1];
-    }
-  }
+function extractDriveFileId(url: string): string | null {
   try {
     const u = new URL(url);
-    const last = u.pathname.split("/").pop() || "qr.pdf";
-    return last.toLowerCase().endsWith(".pdf") ? last : "qr.pdf";
+
+    // Caso 1: https://drive.google.com/file/d/FILEID/view?usp=sharing
+    const m1 = u.pathname.match(/\/file\/d\/([^/]+)/);
+    if (m1?.[1]) return m1[1];
+
+    // Caso 2: https://drive.google.com/open?id=FILEID
+    const id = u.searchParams.get("id");
+    if (id) return id;
+
+    return null;
   } catch {
-    return "qr.pdf";
+    return null;
   }
 }
 
-// Si el QR apunta a HTML (una página), intentamos encontrar un link .pdf dentro
-function tryFindPdfLinkInHtml(html: string, baseUrl: string) {
-  // 1) Busca cualquier URL que termine en .pdf
-  const direct = html.match(/https?:\/\/[^\s"'<>]+\.pdf(\?[^\s"'<>]+)?/i);
-  if (direct?.[0]) return direct[0];
-
-  // 2) Busca href="/algo.pdf" relativo
-  const href = html.match(/href=["']([^"']+\.pdf(\?[^"']+)?)["']/i);
-  if (href?.[1]) {
-    try {
-      return new URL(href[1], baseUrl).toString();
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
+function tryFindConfirmToken(html: string): string | null {
+  // Drive a veces pone confirm=XXXX en la página intermedia
+  const m = html.match(/confirm=([0-9A-Za-z_]+)/);
+  return m?.[1] ?? null;
 }
 
 export async function POST(req: Request) {
@@ -55,14 +41,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "URL inválida" }, { status: 400 });
     }
 
-    // 1) Fetch con headers tipo navegador (evita bloqueos comunes)
-    const res = await fetch(url, {
+    let fetchUrl = url;
+
+    // ✅ Caso Google Drive: convertimos a descarga directa
+    const isDrive =
+      /drive\.google\.com/i.test(url) || /docs\.google\.com/i.test(url);
+
+    if (isDrive) {
+      const fileId = extractDriveFileId(url);
+      if (!fileId) {
+        return NextResponse.json(
+          { error: "Link de Google Drive no reconocido (no pude extraer el fileId)." },
+          { status: 400 }
+        );
+      }
+      fetchUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    }
+
+    // Fetch como “navegador”
+    const res = await fetch(fetchUrl, {
       redirect: "follow",
       headers: {
         "user-agent":
           "Mozilla/5.0 (compatible; CoffeeParser/1.0; +https://coffee-parser.vercel.app)",
-        accept:
-          "application/pdf,application/octet-stream,text/html;q=0.9,*/*;q=0.8",
+        accept: "application/pdf,application/octet-stream,text/html;q=0.9,*/*;q=0.8",
       },
     });
 
@@ -75,22 +77,28 @@ export async function POST(req: Request) {
     }
 
     const ct = (res.headers.get("content-type") || "").toLowerCase();
-    const cd = res.headers.get("content-disposition") || "";
-    const finalUrl = res.url || url;
 
-    // 2) Si es HTML, intentamos extraer un link a PDF y reintentar
-    if (ct.includes("text/html")) {
+    // ✅ Google Drive a veces regresa HTML con confirm token
+    if (isDrive && ct.includes("text/html")) {
       const html = await res.text();
-      const pdfUrl = tryFindPdfLinkInHtml(html, finalUrl);
+      const token = tryFindConfirmToken(html);
 
-      if (!pdfUrl) {
+      // Si no hay token, normalmente es porque NO tienes permiso (o el link no es público)
+      if (!token) {
         return NextResponse.json(
-          { error: "El QR lleva a una página (no PDF) y no encontré un link .pdf dentro." },
+          {
+            error:
+              "Google Drive no devolvió el PDF. Esto suele pasar si el archivo NO es público (Cualquiera con el vínculo) o Drive bloqueó la descarga.",
+          },
           { status: 400 }
         );
       }
 
-      const res2 = await fetch(pdfUrl, {
+      // Reintento con confirm
+      const fileId = extractDriveFileId(url);
+      const confirmUrl = `https://drive.google.com/uc?export=download&confirm=${token}&id=${fileId}`;
+
+      const res2 = await fetch(confirmUrl, {
         redirect: "follow",
         headers: {
           "user-agent":
@@ -102,7 +110,7 @@ export async function POST(req: Request) {
       if (!res2.ok) {
         const ct2 = res2.headers.get("content-type") || "";
         return NextResponse.json(
-          { error: `Encontré un link .pdf pero falló la descarga. Status ${res2.status}. content-type: ${ct2 || "—"}` },
+          { error: `Drive confirmó pero falló la descarga. Status ${res2.status}. content-type: ${ct2 || "—"}` },
           { status: 400 }
         );
       }
@@ -112,25 +120,22 @@ export async function POST(req: Request) {
 
       if (!looksLikePdf(u8)) {
         return NextResponse.json(
-          { error: "Descargué algo pero no parece PDF válido (no inicia con %PDF-)." },
+          { error: "Descargué algo desde Drive pero no parece PDF válido (no inicia con %PDF-)." },
           { status: 400 }
         );
       }
-
-      const cd2 = res2.headers.get("content-disposition") || "";
-      const filename2 = pickFilenameFromHeadersOrUrl(cd2, pdfUrl);
 
       return new NextResponse(ab2, {
         status: 200,
         headers: {
           "content-type": "application/pdf",
-          "x-filename": filename2,
+          "x-filename": "qr.pdf",
           "cache-control": "no-store",
         },
       });
     }
 
-    // 3) Si NO dice PDF pero puede ser octet-stream, lo aceptamos si "huele" a PDF
+    // Caso general: PDF directo u octet-stream pero que “huela” a PDF
     const ab = await res.arrayBuffer();
     const u8 = new Uint8Array(ab);
 
@@ -144,19 +149,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // Límite de tamaño (12MB)
+    // Límite 12MB
     const maxBytes = 12 * 1024 * 1024;
     if (ab.byteLength > maxBytes) {
       return NextResponse.json({ error: "PDF demasiado grande (máx 12MB)" }, { status: 400 });
     }
 
-    const filename = pickFilenameFromHeadersOrUrl(cd, finalUrl);
-
     return new NextResponse(ab, {
       status: 200,
       headers: {
         "content-type": "application/pdf",
-        "x-filename": filename,
+        "x-filename": "qr.pdf",
         "cache-control": "no-store",
       },
     });
