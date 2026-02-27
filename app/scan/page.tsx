@@ -40,7 +40,7 @@ export default function ScanPage() {
 
           if (!res.ok) {
   const raw = await res.text().catch(() => "");
-  let msg = "No se pudo bajar el PDF";
+  let msg = `No se pudo bajar el PDF (status ${res.status})`;
 
   try {
     const j = JSON.parse(raw);
