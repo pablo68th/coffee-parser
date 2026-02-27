@@ -8,25 +8,54 @@ function looksLikePdf(bytes: Uint8Array) {
 function extractDriveFileId(url: string): string | null {
   try {
     const u = new URL(url);
-
-    // Caso 1: https://drive.google.com/file/d/FILEID/view?usp=sharing
-    const m1 = u.pathname.match(/\/file\/d\/([^/]+)/);
+    const m1 = u.pathname.match(/\/file\/d\/([^/]+)/); // /file/d/<id>/
     if (m1?.[1]) return m1[1];
-
-    // Caso 2: https://drive.google.com/open?id=FILEID
-    const id = u.searchParams.get("id");
+    const id = u.searchParams.get("id"); // open?id=<id>
     if (id) return id;
-
     return null;
   } catch {
     return null;
   }
 }
 
-function tryFindConfirmToken(html: string): string | null {
-  // Drive a veces pone confirm=XXXX en la página intermedia
-  const m = html.match(/confirm=([0-9A-Za-z_]+)/);
-  return m?.[1] ?? null;
+function findConfirmToken(html: string): string | null {
+  // Drive suele meter "confirm=XXXX" en algún lado del HTML
+  const m = html.match(/confirm=([0-9A-Za-z_]+)&/);
+  if (m?.[1]) return m[1];
+  const m2 = html.match(/name="confirm"\s+value="([^"]+)"/);
+  if (m2?.[1]) return m2[1];
+  return null;
+}
+
+// Next/Node a veces maneja set-cookie como múltiples headers
+function getSetCookies(res: Response): string[] {
+  const anyHeaders: any = res.headers as any;
+  if (typeof anyHeaders.getSetCookie === "function") {
+    return anyHeaders.getSetCookie(); // Next.js/undici helper
+  }
+  const single = res.headers.get("set-cookie");
+  return single ? [single] : [];
+}
+
+function cookiesToHeader(setCookies: string[]) {
+  // Nos quedamos con "name=value" de cada Set-Cookie
+  const pairs = setCookies
+    .map((c) => c.split(";")[0])
+    .filter(Boolean);
+  return pairs.join("; ");
+}
+
+async function fetchAsBrowser(url: string, cookie?: string) {
+  return fetch(url, {
+    redirect: "follow",
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari",
+      accept:
+        "application/pdf,application/octet-stream,text/html;q=0.9,*/*;q=0.8",
+      ...(cookie ? { cookie } : {}),
+    },
+  });
 }
 
 export async function POST(req: Request) {
@@ -36,96 +65,48 @@ export async function POST(req: Request) {
     if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "Falta url" }, { status: 400 });
     }
-
     if (!/^https?:\/\//i.test(url)) {
       return NextResponse.json({ error: "URL inválida" }, { status: 400 });
     }
 
-    let fetchUrl = url;
-
-    // ✅ Caso Google Drive: convertimos a descarga directa
-    const isDrive =
-      /drive\.google\.com/i.test(url) || /docs\.google\.com/i.test(url);
-
-    if (isDrive) {
-      const fileId = extractDriveFileId(url);
-      if (!fileId) {
-        return NextResponse.json(
-          { error: "Link de Google Drive no reconocido (no pude extraer el fileId)." },
-          { status: 400 }
-        );
-      }
-      fetchUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-    }
-
-    // Fetch como “navegador”
-    const res = await fetch(fetchUrl, {
-      redirect: "follow",
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (compatible; CoffeeParser/1.0; +https://coffee-parser.vercel.app)",
-        accept: "application/pdf,application/octet-stream,text/html;q=0.9,*/*;q=0.8",
-      },
-    });
-
-    if (!res.ok) {
-      const ct = res.headers.get("content-type") || "";
+    const isDrive = /drive\.google\.com/i.test(url);
+    if (!isDrive) {
       return NextResponse.json(
-        { error: `No se pudo descargar. Status ${res.status}. content-type: ${ct || "—"}` },
+        { error: "Este endpoint está configurado para Google Drive por ahora." },
         { status: 400 }
       );
     }
 
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    const fileId = extractDriveFileId(url);
+    if (!fileId) {
+      return NextResponse.json(
+        { error: "No pude extraer el fileId de Google Drive." },
+        { status: 400 }
+      );
+    }
 
-    // ✅ Google Drive a veces regresa HTML con confirm token
-    if (isDrive && ct.includes("text/html")) {
-      const html = await res.text();
-      const token = tryFindConfirmToken(html);
+    // ✅ Endpoint nuevo (muchas veces más directo que drive.google.com/uc)
+    const base = `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
 
-      // Si no hay token, normalmente es porque NO tienes permiso (o el link no es público)
-      if (!token) {
-        return NextResponse.json(
-          {
-            error:
-              "Google Drive no devolvió el PDF. Esto suele pasar si el archivo NO es público (Cualquiera con el vínculo) o Drive bloqueó la descarga.",
-          },
-          { status: 400 }
-        );
-      }
+    // 1) Primer intento
+    const res1 = await fetchAsBrowser(base);
 
-      // Reintento con confirm
-      const fileId = extractDriveFileId(url);
-      const confirmUrl = `https://drive.google.com/uc?export=download&confirm=${token}&id=${fileId}`;
+    if (!res1.ok) {
+      return NextResponse.json(
+        { error: `Drive respondió status ${res1.status}` },
+        { status: 400 }
+      );
+    }
 
-      const res2 = await fetch(confirmUrl, {
-        redirect: "follow",
-        headers: {
-          "user-agent":
-            "Mozilla/5.0 (compatible; CoffeeParser/1.0; +https://coffee-parser.vercel.app)",
-          accept: "application/pdf,application/octet-stream,*/*",
-        },
-      });
+    const ct1 = (res1.headers.get("content-type") || "").toLowerCase();
 
-      if (!res2.ok) {
-        const ct2 = res2.headers.get("content-type") || "";
-        return NextResponse.json(
-          { error: `Drive confirmó pero falló la descarga. Status ${res2.status}. content-type: ${ct2 || "—"}` },
-          { status: 400 }
-        );
-      }
+    // Si ya es PDF/bytes, listo
+    const ab1 = await res1.arrayBuffer();
+    const u81 = new Uint8Array(ab1);
 
-      const ab2 = await res2.arrayBuffer();
-      const u8 = new Uint8Array(ab2);
-
-      if (!looksLikePdf(u8)) {
-        return NextResponse.json(
-          { error: "Descargué algo desde Drive pero no parece PDF válido (no inicia con %PDF-)." },
-          { status: 400 }
-        );
-      }
-
-      return new NextResponse(ab2, {
+    const isPdf1 = ct1.includes("application/pdf") || looksLikePdf(u81);
+    if (isPdf1) {
+      return new NextResponse(ab1, {
         status: 200,
         headers: {
           "content-type": "application/pdf",
@@ -135,27 +116,46 @@ export async function POST(req: Request) {
       });
     }
 
-    // Caso general: PDF directo u octet-stream pero que “huela” a PDF
-    const ab = await res.arrayBuffer();
-    const u8 = new Uint8Array(ab);
+    // 2) Si no parece PDF, casi seguro Drive devolvió HTML con token confirm
+    const html = new TextDecoder().decode(u81);
+    const confirm = findConfirmToken(html);
 
-    const isPdfByHeader = ct.includes("application/pdf");
-    const isPdfByMagic = looksLikePdf(u8);
-
-    if (!isPdfByHeader && !isPdfByMagic) {
+    if (!confirm) {
       return NextResponse.json(
-        { error: `El link no parece PDF (content-type: ${ct || "—"})` },
+        {
+          error:
+            "Drive no devolvió PDF ni token de confirmación. Esto suele pasar si el archivo NO es público (Cualquiera con el vínculo) o Drive bloqueó la descarga.",
+        },
         { status: 400 }
       );
     }
 
-    // Límite 12MB
-    const maxBytes = 12 * 1024 * 1024;
-    if (ab.byteLength > maxBytes) {
-      return NextResponse.json({ error: "PDF demasiado grande (máx 12MB)" }, { status: 400 });
+    // 3) Guardar cookies del primer response y reintentar con confirm + cookies
+    const setCookies = getSetCookies(res1);
+    const cookieHeader = cookiesToHeader(setCookies);
+
+    const url2 = `${base}&confirm=${confirm}`;
+    const res2 = await fetchAsBrowser(url2, cookieHeader || undefined);
+
+    if (!res2.ok) {
+      const ct2 = res2.headers.get("content-type") || "";
+      return NextResponse.json(
+        { error: `Drive confirm falló. Status ${res2.status}. content-type: ${ct2 || "—"}` },
+        { status: 400 }
+      );
     }
 
-    return new NextResponse(ab, {
+    const ab2 = await res2.arrayBuffer();
+    const u82 = new Uint8Array(ab2);
+
+    if (!looksLikePdf(u82)) {
+      return NextResponse.json(
+        { error: "Descargué algo pero no parece PDF válido (no inicia con %PDF-)." },
+        { status: 400 }
+      );
+    }
+
+    return new NextResponse(ab2, {
       status: 200,
       headers: {
         "content-type": "application/pdf",
@@ -164,6 +164,9 @@ export async function POST(req: Request) {
       },
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Error inesperado" }, { status: 500 });
+    return NextResponse.json(
+      { error: e?.message ?? "Error inesperado" },
+      { status: 500 }
+    );
   }
 }
