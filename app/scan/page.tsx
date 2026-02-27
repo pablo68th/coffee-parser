@@ -32,7 +32,7 @@ export default function ScanPage() {
           const url = decodedText.trim();
 
           // 1) Pedir al server que baje el PDF
-          const res = await fetch("/api/fetch-pdf", {
+          const res = await fetch("/api/extract-text/fetch-pdf", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ url }),
