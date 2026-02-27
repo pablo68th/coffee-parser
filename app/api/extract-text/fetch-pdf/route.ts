@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+export async function GET() {
+  return NextResponse.json({ ok: true, msg: "fetch-pdf endpoint alive" });
+}
+
 function looksLikePdf(bytes: Uint8Array) {
   const head = new TextDecoder().decode(bytes.slice(0, 5));
   return head === "%PDF-";
