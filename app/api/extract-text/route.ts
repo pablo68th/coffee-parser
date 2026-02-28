@@ -1,5 +1,10 @@
 export const runtime = "nodejs";
 
+// ✅ Fix para Vercel/Node: pdf.js a veces espera DOMMatrix (API de browser)
+if (!(globalThis as any).DOMMatrix) {
+  (globalThis as any).DOMMatrix = class {};
+}
+
 export async function GET() {
   return Response.json({ ok: true, message: "extract-text endpoint funcionando" });
 }
@@ -22,14 +27,8 @@ export async function POST(req: Request) {
     // pdf.js (legacy build) para Node
     const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
-    // ✅ Worker SRC correcto (evita: "No GlobalWorkerOptions.workerSrc specified")
-    const workerSrc = new URL(
-      "pdfjs-dist/legacy/build/pdf.worker.mjs",
-      import.meta.url
-    ).toString();
-    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
-
-    const loadingTask = pdfjs.getDocument({ data });
+    // ✅ En servidor NO usamos worker (evita issues en Vercel)
+    const loadingTask = pdfjs.getDocument({ data, disableWorker: true });
     const doc = await loadingTask.promise;
 
     let fullText = "";
@@ -53,4 +52,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
