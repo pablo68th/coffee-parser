@@ -1,14 +1,12 @@
 export const runtime = "nodejs";
 
-import { createRequire } from "module";
+import path from "path";
 import { pathToFileURL } from "url";
 
 // ✅ Fix para Vercel/Node: pdf.js a veces espera DOMMatrix (API de browser)
 if (!(globalThis as any).DOMMatrix) {
   (globalThis as any).DOMMatrix = class {};
 }
-
-const require = createRequire(import.meta.url);
 
 export async function GET() {
   return Response.json({ ok: true, message: "extract-text endpoint funcionando" });
@@ -29,12 +27,18 @@ export async function POST(req: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
 
-    // ✅ pdf.js (legacy build para Node)
     const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
-    // ✅ Worker: ruta REAL dentro de node_modules (NO .next/chunks)
-    const workerPath = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
-    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
+    // ✅ Worker: ruta ABSOLUTA real (sin require.resolve)
+    const workerFsPath = path.join(
+      process.cwd(),
+      "node_modules",
+      "pdfjs-dist",
+      "legacy",
+      "build",
+      "pdf.worker.mjs"
+    );
+    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerFsPath).toString();
 
     const loadingTask = pdfjs.getDocument({ data });
     const doc = await loadingTask.promise;
