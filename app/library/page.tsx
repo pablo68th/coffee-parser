@@ -16,7 +16,12 @@ type CoffeeItem = {
   search_text?: string;
   rating_label?: "favorite" | "liked" | "neutral" | "disliked";
   created_at?: number;
-  assets?: { id: string; storage_path: string; original_filename: string | null }[];
+  assets?: {
+  id: string;
+  coffee_id: string;
+  storage_path: string;
+  original_filename: string | null;
+}[];
 };
 
 function prettyRating(r?: CoffeeItem["rating_label"]) {
@@ -51,18 +56,33 @@ useEffect(() => {
     return;
     }
 
-    const { data, error } = await supabase
-    .from("coffees")
-    .select("*, assets(id, storage_path, original_filename)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+const { data: coffees, error: coffeesError } = await supabase
+  .from("coffees")
+  .select("*")
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false });
 
-    if (error) {
-      console.log("Error cargando coffees:", error);
-      return;
-    }
+if (coffeesError) {
+  console.log("Error cargando coffees:", coffeesError);
+  return;
+}
 
-    setItems(data || []);
+const { data: assets, error: assetsError } = await supabase
+  .from("assets")
+  .select("id, coffee_id, storage_path, original_filename")
+  .eq("user_id", user.id);
+
+if (assetsError) {
+  console.log("Error cargando assets:", assetsError);
+  return;
+}
+
+const merged = (coffees || []).map((coffee) => ({
+  ...coffee,
+  assets: (assets || []).filter((a) => a.coffee_id === coffee.id),
+}));
+
+setItems(merged);
   }
 
   loadFromDB();
