@@ -62,8 +62,15 @@ export default function ProfilePage() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
+      if (error) {
+  alert("No se pudo cargar tu perfil: " + error.message);
+  setLoading(false);
+  return;
+}
+
       setRows((data as CoffeeRow[]) || []);
       setLoading(false);
+      
     }
 
     load();
@@ -107,6 +114,9 @@ if (r.varietal) {
   .slice(0, 10);
 
 return {
+  totalCoffees: rows.length,
+  totalFavorites: rows.filter((r) => r.rating_label === "favorite").length,
+  totalLiked: rows.filter((r) => r.rating_label === "liked").length,
   topProcesses: top(processCounts),
   topRegions: top(regionCounts),
   topVarietals: top(varietalCounts),
@@ -141,6 +151,34 @@ return {
         ← Volver a Library
       </button>
       
+{!loading && rows.length > 0 && (
+  <div
+    style={{
+      marginTop: 16,
+      border: "1px solid #ddd",
+      borderRadius: 12,
+      padding: 14,
+    }}
+  >
+    <div style={{ fontWeight: 900 }}>Resumen</div>
+
+    <div style={{ marginTop: 10, display: "grid", gap: 6, fontSize: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <span>Cafés guardados</span>
+        <strong>{stats.totalCoffees}</strong>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <span>Favorites</span>
+        <strong>{stats.totalFavorites}</strong>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <span>Liked</span>
+        <strong>{stats.totalLiked}</strong>
+      </div>
+    </div>
+  </div>
+)}
+
       {!loading && (
         <FavoritesSection rows={rows} />
       )}
@@ -192,16 +230,18 @@ function FavoritesSection(props: { rows: CoffeeRow[] }) {
 
   return (
     <div style={{ marginTop: 16, border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
-      <div style={{ fontWeight: 900 }}>Tu gusto (Favorites & Liked)</div>
+      <div style={{ fontWeight: 900 }}>Tu gusto hasta ahora</div>
 
       {favorites.length > 0 && (
         <div style={{ marginTop: 10 }}>
           <div style={{ fontWeight: 800, fontSize: 13, opacity: 0.85 }}>⭐ Favorites</div>
           <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
             {favorites.map((f) => (
-              <div key={f.id} style={{ fontSize: 14 }}>
-                {f.region || "Café"}{f.process ? ` — ${f.process}` : ""}
-                {f.varietal ? ` — ${f.varietal}` : ""}
+                            <div key={f.id} style={{ fontSize: 14 }}>
+                <div style={{ fontWeight: 700 }}>{f.region || "Café"}</div>
+                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
+                  {f.process || "—"}{f.varietal ? ` · ${f.varietal}` : ""}
+                </div>
               </div>
             ))}
           </div>
@@ -213,9 +253,11 @@ function FavoritesSection(props: { rows: CoffeeRow[] }) {
           <div style={{ fontWeight: 800, fontSize: 13, opacity: 0.85 }}>🙂 Liked</div>
           <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
             {liked.slice(0, 10).map((f) => (
-              <div key={f.id} style={{ fontSize: 14 }}>
-                {f.region || "Café"}{f.process ? ` — ${f.process}` : ""}
-                {f.varietal ? ` — ${f.varietal}` : ""}
+                            <div key={f.id} style={{ fontSize: 14 }}>
+                <div style={{ fontWeight: 700 }}>{f.region || "Café"}</div>
+                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
+                  {f.process || "—"}{f.varietal ? ` · ${f.varietal}` : ""}
+                </div>
               </div>
             ))}
           </div>
