@@ -11,12 +11,39 @@ export type ParsedCoffee = {
   tasting_notes?: string[];
 };
 
+const MEXICAN_STATES = [
+  "Veracruz",
+  "Chiapas",
+  "Oaxaca",
+  "Puebla",
+  "Guerrero",
+  "Nayarit",
+  "Jalisco",
+  "Michoacán",
+  "Hidalgo",
+  "Estado de México",
+  "CDMX",
+];
+
 function clean(s: string) {
   return s.replace(/\s+/g, " ").trim();
 }
 
+function normalizeUnicode(s: string) {
+  return s.normalize("NFC");
+}
+
+function detectMexicanState(text: string) {
+  for (const st of MEXICAN_STATES) {
+    const re = new RegExp(`\\b${st.replace(".", "\\.")}\\b`, "i");
+    if (re.test(text)) return st;
+  }
+  return undefined;
+}
+
 export function parseCoffeeFromText(raw: string): ParsedCoffee {
-  const text = clean(raw);
+  const normalizedRaw = normalizeUnicode(raw || "");
+  const text = clean(normalizedRaw);
   const parsed: ParsedCoffee = {};
 
   // Altura: "Altura 1312 msnm"
@@ -44,10 +71,24 @@ export function parseCoffeeFromText(raw: string): ParsedCoffee {
   }
 
   // Región: suele estar justo ANTES de "Altura"
+  // Usamos text normalizado para no perder acentos raros
   const beforeAlt = text.split(/Altura/i)[0];
   if (beforeAlt) {
     const stop = new Set([
       "veracruz",
+      "chiapas",
+      "oaxaca",
+      "puebla",
+      "guerrero",
+      "nayarit",
+      "jalisco",
+      "michoacán",
+      "michoacan",
+      "hidalgo",
+      "estado",
+      "méxico",
+      "mexico",
+      "cdmx",
       "origen",
       "perfil",
       "sensorial",
@@ -57,8 +98,8 @@ export function parseCoffeeFromText(raw: string): ParsedCoffee {
       "zona",
       "central",
       "montañosa",
+      "montanosa",
       "del",
-      "estado",
       "de",
       "msnm",
       "cafe",
@@ -85,50 +126,32 @@ export function parseCoffeeFromText(raw: string): ParsedCoffee {
     }
   }
 
-  // País fijo (por ahora)
-  if (text.match(/\bVeracruz\b/i)) parsed.country = "México";
+  // País / origen detectado
+  const detectedState = detectMexicanState(text);
+
+  if (detectedState) {
+    parsed.country = "México";
+  } else {
+    const detectedCountry = text.match(
+      /\b(México|Colombia|Ethiopia|Etiopía|Guatemala|Kenya|Kenia|Brazil|Brasil|Perú)\b/i
+    )?.[1];
+
+    if (detectedCountry) {
+      parsed.country = detectedCountry;
+    }
+  }
 
   // Varietal
   const varietalMatch = text.match(/\b(Typica|Bourbon|Caturra|Mundo Maya)\b/i);
   if (varietalMatch) parsed.varietal = varietalMatch[1];
 
   // --- coffee_name automático: "Origen (Región) — Proceso" ---
-
-  const mexicanStates = [
-    "Veracruz",
-    "Chiapas",
-    "Oaxaca",
-    "Puebla",
-    "Guerrero",
-    "Nayarit",
-    "Jalisco",
-    "Michoacán",
-    "Hidalgo",
-    "Estado de México",
-    "CDMX",
-  ];
-
-  let detectedState: string | undefined;
-  for (const st of mexicanStates) {
-    const re = new RegExp(`\\b${st.replace(".", "\\.")}\\b`, "i");
-    if (re.test(text)) {
-      detectedState = st;
-      break;
-    }
-  }
-
-  const origin =
-    detectedState ||
-    parsed.country ||
-    (text.match(
-      /\b(México|Colombia|Ethiopia|Etiopía|Guatemala|Kenya|Kenia|Brazil|Brasil|Perú)\b/i
-    )?.[1] as string | undefined) ||
-    "Café";
+  const origin = detectedState || parsed.country || "Café";
 
   const regionPart = parsed.region ? ` (${parsed.region})` : "";
   const processPart = parsed.process ? ` — ${parsed.process}` : "";
 
-  parsed.coffee_name = `${origin}${regionPart}${processPart}`.trim();
+  parsed.coffee_name = clean(`${origin}${regionPart}${processPart}`);
 
   return parsed;
 }
