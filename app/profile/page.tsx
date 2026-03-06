@@ -46,23 +46,28 @@ export default function ProfilePage() {
     async function load() {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("coffees")
-        .select("id, process, region, varietal, rating_label, created_at")
-        .order("created_at", { ascending: false });
+      const {
+      data: { user },
+      } = await supabase.auth.getUser();
 
-      if (error) {
-        alert("Error cargando perfil: " + error.message);
-        setLoading(false);
-        return;
+      if (!user) {
+      router.push("/auth");
+      setLoading(false);
+      return;
       }
+
+      const { data, error } = await supabase
+      .from("coffees")
+      .select("id, process, region, varietal, rating_label, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
 
       setRows((data as CoffeeRow[]) || []);
       setLoading(false);
     }
 
     load();
-  }, []);
+  }, [router]);
 
   const stats = useMemo(() => {
     const likedFav = new Set(["liked", "favorite"]);

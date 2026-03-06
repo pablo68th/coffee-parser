@@ -30,15 +30,16 @@ export async function POST(req: Request) {
     const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
     // ✅ Worker: ruta ABSOLUTA real (sin require.resolve)
-    const workerFsPath = path.join(
-      process.cwd(),
-      "node_modules",
-      "pdfjs-dist",
-      "legacy",
-      "build",
-      "pdf.worker.mjs"
-    );
-    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerFsPath).toString();
+const workerFsPath = path.join(
+  process.cwd(),
+  "node_modules",
+  "pdfjs-dist",
+  "legacy",
+  "build",
+  "pdf.worker.mjs"
+);
+
+pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerFsPath).toString();
 
     const loadingTask = pdfjs.getDocument({ data });
     const doc = await loadingTask.promise;

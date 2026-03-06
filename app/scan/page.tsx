@@ -8,10 +8,12 @@ import { supabase } from "@/lib/supabaseClient";
 export default function ScanPage() {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "scanning" | "loading" | "error">("idle");
+  const [statusText, setStatusText] = useState("Preparando cámara...");
   const [errorMsg, setErrorMsg] = useState<string>("");
 
   useEffect(() => {
     setStatus("scanning");
+    setStatusText("Escaneando QR...");
 
     const scanner = new Html5QrcodeScanner(
       "qr-reader",
@@ -23,6 +25,7 @@ export default function ScanPage() {
       async (decodedText) => {
         try {
           setStatus("loading");
+          setStatusText("QR detectado. Descargando PDF...");
           setErrorMsg("");
 
           // Ya lo leímos: paramos scanner para que no se dispare 20 veces
@@ -55,16 +58,11 @@ export default function ScanPage() {
           const filename = res.headers.get("x-filename") || "qr.pdf";
           const blob = await res.blob();
 
+          setStatusText("PDF descargado. Extrayendo texto...");
+
           // 2) Convertir a "archivo" y reusar tu flujo actual
           const file = new File([blob], filename, { type: "application/pdf" });
 
-          // Guardamos el archivo en localStorage como si fuera upload normal:
-          // OJO: no guardamos el archivo en sí, guardamos el texto después.
-          // Entonces: aquí solo mandamos a Home con un truco? No.
-          // Mejor: hacemos el flujo completo aquí: extract-text + upload storage.
-          // Pero tú ya lo tienes armado en Home.
-          //
-          // Solución simple: reutilizamos el endpoint /api/extract-text aquí mismo
           const fd = new FormData();
           fd.append("file", file);
 
@@ -79,14 +77,14 @@ export default function ScanPage() {
           const exJson = JSON.parse(exBody);
           if (!ex.ok) {
             throw new Error(exJson?.error ?? "Error extrayendo texto");
+
+            setStatusText("Texto extraído. Guardando PDF...");
           }
 
           // 3) Guardar para /confirm (igual que Home)
           localStorage.setItem("last_pdf_text", exJson.text || "");
           localStorage.setItem("last_pdf_filename", filename);
 
-          // Nota: storage_path lo genera Home al subir a Storage.
-          // Aquí también lo hacemos: subimos el PDF.
           const safeName = file.name
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
@@ -106,17 +104,9 @@ if (uploadError) {
   localStorage.setItem("last_pdf_storage_path", path);
   localStorage.setItem("last_pdf_mime", "application/pdf");
 }
-
-            
-          // Necesitas tu supabase client aquí? En /scan no lo importamos.
-          // Para mantenerlo simple: NO subimos aquí.
-          // Peeero tú quieres guardar el PDF siempre (brief).
-          // Entonces lo correcto es subirlo aquí también.
-
-          // 👉 Para subir desde /scan, vamos a pedirte 1 cosa:
-          // copiar la subida a Storage desde Home aquí.
-          // Te lo pongo como Paso 2B (abajo), para mantenerlo claro.
-
+          
+          setStatusText("Abriendo confirmación...");
+          
           // Por ahora, mandamos a confirm y ahí NO creará asset si no hay storage_path.
           // Si quieres cumplir el brief al 100%, hacemos el Paso 2B.
           router.push("/confirm");
@@ -154,24 +144,52 @@ if (uploadError) {
       />
 
       {status === "loading" && (
-        <div style={{ marginTop: 12, opacity: 0.8, fontWeight: 800 }}>Procesando...</div>
-      )}
+  <div
+    style={{
+      marginTop: 12,
+      border: "1px solid #ddd",
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 14,
+      fontWeight: 800,
+      background: "white",
+    }}
+  >
+    {statusText}
+  </div>
+)}
 
       {status === "error" && (
-        <div
-          style={{
-            marginTop: 12,
-            border: "1px solid #f0c36d",
-            background: "#fff7e6",
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 13,
-          }}
-        >
-          <strong>No se pudo.</strong>
-          <div style={{ marginTop: 6 }}>{errorMsg}</div>
-        </div>
-      )}
+  <div
+    style={{
+      marginTop: 12,
+      border: "1px solid #f0c36d",
+      background: "#fff7e6",
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+    }}
+  >
+    <strong>No se pudo.</strong>
+    <div style={{ marginTop: 6 }}>{errorMsg}</div>
+
+    <button
+      style={{
+        marginTop: 12,
+        width: "100%",
+        padding: 12,
+        borderRadius: 12,
+        border: "1px solid #ccc",
+        fontWeight: 800,
+        background: "white",
+        color: "#000",
+      }}
+      onClick={() => router.refresh()}
+    >
+      Escanear otro
+    </button>
+  </div>
+)}
 
       <button
         style={{

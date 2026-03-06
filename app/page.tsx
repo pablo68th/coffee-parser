@@ -183,6 +183,28 @@ export default function Home() {
       >
         Ver biblioteca →
       </button>
-    </main>
+
+      <button
+  style={{
+    marginTop: 10,
+    width: "100%",
+    padding: 14,
+    borderRadius: 12,
+    border: "1px solid #eee",
+    fontWeight: 800,
+    background: "white",
+    color: "#000",
+  }}
+  onClick={async () => {
+    await supabase.auth.signOut();
+    router.push("/auth");
+  }}
+>
+  Cerrar sesión
+</button>
+
+    </main> 
   );
+        
+
 }

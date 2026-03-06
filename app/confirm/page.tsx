@@ -178,9 +178,19 @@ return;
   }
 }
 
+  // fetch authenticated user and guard against null
+  const { data } = await supabase.auth.getUser();
+  const user = data?.user;
+  if (!user) {
+    console.error("No authenticated user");
+    setSaving(false);
+    return;
+  }
+
   const { data: coffeeRows, error } = await supabase
     .from("coffees")
     .insert({
+      user_id: user.id,
       coffee_name: displayCoffeeName ?? null,
       region: fixedRegion ?? null,
       country: parsed.country ?? null,
@@ -224,6 +234,7 @@ search_text: [
   // Entonces: si no hay storage_path, igual dejamos guardar el café y seguimos.
   if (coffee_id && storage_path) {
     const { error: assetError } = await supabase.from("assets").insert({
+      user_id: user.id,
       coffee_id,
       asset_type: "pdf",
       storage_path,
@@ -246,6 +257,7 @@ search_text: [
 try {
   if (coffee_id) {
 const payload = {
+  user_id: user.id,
   coffee_id: coffee_id,
   parser_version: PARSER_VERSION,
   raw_text: (rawText || "").replace(/\s+/g, " ").trim(),

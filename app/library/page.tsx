@@ -33,30 +33,40 @@ export default function LibraryPage() {
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadFromDB() {
-      const { data, error } = await supabase
-        .from("coffees")
-        .select("*, assets(id, storage_path, original_filename)")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.log("Error cargando coffees:", error);
-        return;
-      }
-
-      setItems(data || []);
-    }
-
-    loadFromDB();
-  }, []);
-
   // ✅ auto-hide del toast (sin loops)
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 1000);
     return () => clearTimeout(t);
   }, [toast]);
+
+useEffect(() => {
+    async function loadFromDB() {
+      const {
+    data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+    router.push("/auth");
+    return;
+    }
+
+    const { data, error } = await supabase
+    .from("coffees")
+    .select("*, assets(id, storage_path, original_filename)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+    if (error) {
+      console.log("Error cargando coffees:", error);
+      return;
+    }
+
+    setItems(data || []);
+  }
+
+  loadFromDB();
+}, [router]);
 
   async function updateRating(id: string, newRating: CoffeeItem["rating_label"]) {
     const ratingScore =
@@ -68,14 +78,24 @@ export default function LibraryPage() {
         ? 1
         : 0;
 
-    const { error } = await supabase
-      .from("coffees")
-      .update({
-        rating_label: newRating,
-        rating_score: ratingScore,
-        is_favorite: newRating === "favorite",
-      })
-      .eq("id", id);
+          const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/auth");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("coffees")
+        .update({
+          rating_label: newRating,
+          rating_score: ratingScore,
+          is_favorite: newRating === "favorite",
+        })
+        .eq("id", id)
+        .eq("user_id", user.id);
 
     if (error) {
       alert("No se pudo actualizar rating: " + error.message);
@@ -188,7 +208,19 @@ export default function LibraryPage() {
           );
           if (!ok) return;
 
-          const { error } = await supabase.from("coffees").delete().not("id", "is", null);
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+
+          if (!user) {
+            router.push("/auth");
+            return;
+          }
+
+          const { error } = await supabase
+            .from("coffees")
+            .delete()
+            .eq("user_id", user.id);
 
           if (error) {
             alert("No se pudo vaciar: " + error.message);
@@ -278,7 +310,20 @@ export default function LibraryPage() {
                     const ok = confirm("¿Eliminar este café? (se borrará de la base de datos)");
                     if (!ok) return;
 
-                    const { error } = await supabase.from("coffees").delete().eq("id", c.id);
+                    const {
+                      data: { user },
+                    } = await supabase.auth.getUser();
+
+                    if (!user) {
+                      router.push("/auth");
+                      return;
+                    }
+
+                    const { error } = await supabase
+                      .from("coffees")
+                      .delete()
+                      .eq("id", c.id)
+                      .eq("user_id", user.id);
 
                     if (error) {
                       alert("No se pudo borrar: " + error.message);
