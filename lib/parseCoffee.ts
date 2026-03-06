@@ -233,9 +233,52 @@ export function parseCoffeeFromText(raw: string): ParsedCoffee {
     parsed.process = findCanonicalFromAliases(text, PROCESS_ALIASES);
   }
 
-  // Región: suele estar justo ANTES de "Altura"
+  // Región: preferimos lo que venga entre el estado detectado y "Altura"
   const beforeAlt = text.split(/Altura/i)[0];
-  if (beforeAlt) {
+  const detectedStateForRegion = detectMexicanState(beforeAlt);
+
+  if (beforeAlt && detectedStateForRegion) {
+    const parts = beforeAlt.split(new RegExp(`\\b${escapeRegex(detectedStateForRegion)}\\b`, "i"));
+    const afterState = clean(parts[1] || "");
+
+    if (afterState) {
+      const regionTokens = afterState
+        .split(/\s+/)
+        .map((t) => t.replace(/[^A-Za-zÁÉÍÓÚÜÑñ\-]/g, ""))
+        .filter(Boolean);
+
+      // tomar 1 o 2 palabras después del estado, evitando ruido común
+      const stop = new Set([
+        "origen",
+        "perfil",
+        "sensorial",
+        "ubicado",
+        "en",
+        "la",
+        "zona",
+        "central",
+        "montañosa",
+        "montanosa",
+        "del",
+        "de",
+        "msnm",
+        "cafe",
+        "café",
+        "especialidad",
+        "blend",
+        "station",
+      ]);
+
+      const cleanTokens = regionTokens.filter((t) => !stop.has(t.toLowerCase()));
+
+      if (cleanTokens.length > 0) {
+        parsed.region = cleanTokens.slice(0, 2).join(" ");
+      }
+    }
+  }
+
+  // fallback: si no encontramos región con el método anterior, usar el método viejo
+  if (!parsed.region && beforeAlt) {
     const stop = new Set([
       "veracruz",
       "chiapas",
