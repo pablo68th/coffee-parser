@@ -376,9 +376,6 @@ export function parseCoffeeFromText(raw: string): ParsedCoffee {
 
   const corrected = applyParserCorrections(parsed);
 
-  console.log("DEBUG parsed BEFORE correction:", parsed);
-  console.log("DEBUG parsed AFTER correction:", corrected);
-
   return corrected;
 }
 
