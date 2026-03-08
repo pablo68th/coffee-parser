@@ -33,16 +33,10 @@ useEffect(() => {
   setFilename(localStorage.getItem("last_pdf_filename") || "");
   setRating(null); // ✅ siempre arrancar sin rating
 }, []);
-  const parsed = parseCoffeeFromText(rawText);
 
-console.log("DEBUG parsed:", parsed);
-console.log("DEBUG parsed.region:", parsed.region);
-console.log("DEBUG parsed.coffee_name:", parsed.coffee_name);
-console.log("DEBUG filename:", filename);
+const parsed = parseCoffeeFromText(rawText);
 
-  const prettyRegion = regionFromFilename(filename);
-
-console.log("DEBUG prettyRegion:", prettyRegion);
+const prettyRegion = regionFromFilename(filename);
 const fixedRegion =
   parsed.region || prettyRegion || "";
 
