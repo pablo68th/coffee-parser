@@ -35,7 +35,14 @@ useEffect(() => {
 }, []);
   const parsed = parseCoffeeFromText(rawText);
 
+console.log("DEBUG parsed:", parsed);
+console.log("DEBUG parsed.region:", parsed.region);
+console.log("DEBUG parsed.coffee_name:", parsed.coffee_name);
+console.log("DEBUG filename:", filename);
+
   const prettyRegion = regionFromFilename(filename);
+
+console.log("DEBUG prettyRegion:", prettyRegion);
 const fixedRegion =
   parsed.region || prettyRegion || "";
 
@@ -232,7 +239,7 @@ search_text: [
 
   const coffee_id = coffeeRows?.[0]?.id;
   alert("DEBUG coffee_id = " + coffee_id);
-  
+
   // Regla: nunca bloquear guardado por datos faltantes
   // Entonces: si no hay storage_path, igual dejamos guardar el café y seguimos.
   if (coffee_id && storage_path) {
