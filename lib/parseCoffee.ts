@@ -372,7 +372,15 @@ export function parseCoffeeFromText(raw: string): ParsedCoffee {
   const regionPart = parsed.region ? ` (${parsed.region})` : "";
   const processPart = parsed.process ? ` — ${parsed.process}` : "";
 
-  parsed.coffee_name = clean(`${origin}${regionPart}${processPart}`);
+    parsed.coffee_name = clean(`${origin}${regionPart}${processPart}`);
 
-  return applyParserCorrections(parsed);
+  const corrected = applyParserCorrections(parsed);
+
+  console.log("DEBUG parsed BEFORE correction:", parsed);
+  console.log("DEBUG parsed AFTER correction:", corrected);
+
+  return corrected;
 }
+
+
+

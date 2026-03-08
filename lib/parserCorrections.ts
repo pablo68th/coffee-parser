@@ -29,8 +29,9 @@ function applyCorrection(
 }
 
 const REGION_CORRECTIONS = buildCorrectionMap({
-  "Ixhuatln": "Ixhuatlán",
+  "Ixuatln": "Ixhuatlán",
   "Ixhuatlan": "Ixhuatlán",
+  "Ixhuatln": "Ixhuatlán",
   "Cosautlan": "Cosautlán",
   "Michoacan": "Michoacán",
 });
