@@ -223,10 +223,11 @@ search_text: [
   .trim(),    })
     .select("id");
 
-  if (error) {
-    alert("Error Supabase (coffees): " + error.message);
-    return;
-  }
+    if (error) {
+      alert("Error Supabase (coffees): " + error.message);
+      setSaving(false);
+      return;
+    }
 
   const coffee_id = coffeeRows?.[0]?.id;
 
@@ -264,8 +265,7 @@ const payload = {
   parsed_json: parsed,
 };
 
-
-    const { data, error } = await supabase
+  const { data, error } = await supabase
   .from("extractions")
   .insert(payload)
   .select("id");
@@ -283,6 +283,12 @@ if (error) {
   alert("❌ Excepción rara guardando extraction (ver consola).");
   console.log("EXTRACTIONS EXCEPTION:", e);
 }  
+
+    localStorage.removeItem("last_pdf_text");
+    localStorage.removeItem("last_pdf_filename");
+    localStorage.removeItem("last_pdf_storage_path");
+    localStorage.removeItem("last_pdf_mime");
+    setSaving(false);
 
   router.push("/library");
 }}
