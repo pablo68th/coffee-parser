@@ -1,3 +1,5 @@
+import { applyParserCorrections } from "./parserCorrections";
+
 export const PARSER_VERSION = "blend_station_pdf_v1";
 export const SOURCE_TYPE = "blend_station_pdf";
 
@@ -372,5 +374,5 @@ export function parseCoffeeFromText(raw: string): ParsedCoffee {
 
   parsed.coffee_name = clean(`${origin}${regionPart}${processPart}`);
 
-  return parsed;
+  return applyParserCorrections(parsed);
 }
