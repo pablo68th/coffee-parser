@@ -146,6 +146,7 @@ onClick={async () => {
   setSaving(true);
 
   const storage_path = localStorage.getItem("last_pdf_storage_path");
+  alert("DEBUG storage_path = " + storage_path);
 
   const original_filename =
     filename || localStorage.getItem("last_pdf_filename") || null;
@@ -230,7 +231,8 @@ search_text: [
     }
 
   const coffee_id = coffeeRows?.[0]?.id;
-
+  alert("DEBUG coffee_id = " + coffee_id);
+  
   // Regla: nunca bloquear guardado por datos faltantes
   // Entonces: si no hay storage_path, igual dejamos guardar el café y seguimos.
   if (coffee_id && storage_path) {
