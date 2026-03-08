@@ -75,6 +75,8 @@ export default function Home() {
       localStorage.setItem("last_pdf_storage_path", path);
       localStorage.setItem("last_pdf_mime", "application/pdf");
 
+      alert("DEBUG home storage_path = " + path);
+
       // 4) Ir a confirm
       router.push("/confirm");
     } catch (e: any) {

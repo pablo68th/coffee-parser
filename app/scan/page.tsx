@@ -98,12 +98,13 @@ const { error: uploadError } = await supabase.storage
   .upload(path, file, { contentType: "application/pdf" });
 
 if (uploadError) {
-  // No bloqueamos (frictionless), pero avisamos
-  console.log("No se pudo subir PDF a Storage:", uploadError.message);
-} else {
-  localStorage.setItem("last_pdf_storage_path", path);
-  localStorage.setItem("last_pdf_mime", "application/pdf");
+  throw new Error("No se pudo subir el PDF a Storage: " + uploadError.message);
 }
+
+localStorage.setItem("last_pdf_storage_path", path);
+localStorage.setItem("last_pdf_mime", "application/pdf");
+
+alert("DEBUG scan storage_path = " + path);
           
           setStatusText("Abriendo confirmación...");
           
