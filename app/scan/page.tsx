@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function ScanPage() {
@@ -12,115 +12,150 @@ export default function ScanPage() {
   const [errorMsg, setErrorMsg] = useState<string>("");
 
   useEffect(() => {
-    setStatus("scanning");
-    setStatusText("Escaneando QR...");
+    let isMounted = true;
+    const html5QrCode = new Html5Qrcode("qr-reader");
 
-    const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      { fps: 10, qrbox: 250 },
-      false
-    );
+    async function startScanner() {
+      try {
+        setStatus("scanning");
+        setStatusText("Escaneando QR...");
+        setErrorMsg("");
 
-    scanner.render(
-      async (decodedText) => {
+        const config = {
+          fps: 10,
+          qrbox: 250,
+          aspectRatio: 1,
+        };
+
+        const onScanSuccess = async (decodedText: string) => {
+          try {
+            if (!isMounted) return;
+
+            setStatus("loading");
+            setStatusText("QR detectado. Descargando PDF...");
+            setErrorMsg("");
+
+            // Ya lo leímos: paramos scanner para que no se dispare varias veces
+            await html5QrCode.stop().catch(() => {});
+
+            const url = decodedText.trim();
+
+            // 1) Pedir al server que baje el PDF
+            const res = await fetch("/api/extract-text/fetch-pdf", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ url }),
+            });
+
+            if (!res.ok) {
+              const raw = await res.text().catch(() => "");
+              let msg = `No se pudo bajar el PDF (status ${res.status})`;
+
+              try {
+                const j = JSON.parse(raw);
+                if (j?.error) msg = j.error;
+              } catch {
+                if (raw) msg = raw.slice(0, 200);
+              }
+
+              throw new Error(msg);
+            }
+
+            const filename = res.headers.get("x-filename") || "qr.pdf";
+            const blob = await res.blob();
+
+            setStatusText("PDF descargado. Extrayendo texto...");
+
+            // 2) Convertir a "archivo" y reusar tu flujo actual
+            const file = new File([blob], filename, { type: "application/pdf" });
+
+            const fd = new FormData();
+            fd.append("file", file);
+
+            const ex = await fetch("/api/extract-text", { method: "POST", body: fd });
+            const exCt = ex.headers.get("content-type") || "";
+            const exBody = await ex.text();
+
+            if (!exCt.includes("application/json")) {
+              throw new Error("No se pudo extraer texto del PDF (respuesta inválida).");
+            }
+
+            const exJson = JSON.parse(exBody);
+
+            if (!ex.ok) {
+              throw new Error(exJson?.error ?? "Error extrayendo texto");
+            }
+
+            // 3) Guardar para /confirm (igual que Home)
+            localStorage.setItem("last_pdf_text", exJson.text || "");
+            localStorage.setItem("last_pdf_filename", filename);
+
+            const safeName = file.name
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/\s+/g, "_")
+              .replace(/[^a-zA-Z0-9._-]/g, "_");
+
+            const path = `pdfs/${Date.now()}_${safeName}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from("coffee-pdfs")
+              .upload(path, file, { contentType: "application/pdf" });
+
+            if (uploadError) {
+              throw new Error("No se pudo subir el PDF a Storage: " + uploadError.message);
+            }
+
+            localStorage.setItem("last_pdf_storage_path", path);
+            localStorage.setItem("last_pdf_mime", "application/pdf");
+
+            setStatusText("Abriendo confirmación...");
+            router.push("/confirm");
+          } catch (e: any) {
+            if (!isMounted) return;
+            setStatus("error");
+            setErrorMsg(e?.message ?? "Error leyendo QR");
+          }
+        };
+
+        const onScanFailure = () => {
+          // ignoramos fallos de lectura continuos para no molestar
+        };
+
+        // 1) Intento fuerte: forzar trasera
         try {
-          setStatus("loading");
-          setStatusText("QR detectado. Descargando PDF...");
-          setErrorMsg("");
-
-          // Ya lo leímos: paramos scanner para que no se dispare 20 veces
-          await scanner.clear();
-
-          // decodedText debería ser una URL (link al PDF)
-          const url = decodedText.trim();
-
-          // 1) Pedir al server que baje el PDF
-          const res = await fetch("/api/extract-text/fetch-pdf", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ url }),
-          });
-
-          if (!res.ok) {
-  const raw = await res.text().catch(() => "");
-  let msg = `No se pudo bajar el PDF (status ${res.status})`;
-
-  try {
-    const j = JSON.parse(raw);
-    if (j?.error) msg = j.error;
-  } catch {
-    if (raw) msg = raw.slice(0, 200);
-  }
-
-  throw new Error(msg);
-}
-
-          const filename = res.headers.get("x-filename") || "qr.pdf";
-          const blob = await res.blob();
-
-          setStatusText("PDF descargado. Extrayendo texto...");
-
-          // 2) Convertir a "archivo" y reusar tu flujo actual
-          const file = new File([blob], filename, { type: "application/pdf" });
-
-          const fd = new FormData();
-          fd.append("file", file);
-
-          const ex = await fetch("/api/extract-text", { method: "POST", body: fd });
-          const exCt = ex.headers.get("content-type") || "";
-          const exBody = await ex.text();
-
-          if (!exCt.includes("application/json")) {
-            throw new Error("No se pudo extraer texto del PDF (respuesta inválida).");
-          }
-
-          const exJson = JSON.parse(exBody);
-          if (!ex.ok) {
-            throw new Error(exJson?.error ?? "Error extrayendo texto");
-
-            setStatusText("Texto extraído. Guardando PDF...");
-          }
-
-          // 3) Guardar para /confirm (igual que Home)
-          localStorage.setItem("last_pdf_text", exJson.text || "");
-          localStorage.setItem("last_pdf_filename", filename);
-
-          const safeName = file.name
-  .normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "")
-  .replace(/\s+/g, "_")
-  .replace(/[^a-zA-Z0-9._-]/g, "_");
-
-const path = `pdfs/${Date.now()}_${safeName}`;
-
-const { error: uploadError } = await supabase.storage
-  .from("coffee-pdfs")
-  .upload(path, file, { contentType: "application/pdf" });
-
-if (uploadError) {
-  throw new Error("No se pudo subir el PDF a Storage: " + uploadError.message);
-}
-
-localStorage.setItem("last_pdf_storage_path", path);
-localStorage.setItem("last_pdf_mime", "application/pdf");
-          
-          setStatusText("Abriendo confirmación...");
-          
-          // Por ahora, mandamos a confirm y ahí NO creará asset si no hay storage_path.
-          // Si quieres cumplir el brief al 100%, hacemos el Paso 2B.
-          router.push("/confirm");
-        } catch (e: any) {
-          setStatus("error");
-          setErrorMsg(e?.message ?? "Error leyendo QR");
+          await html5QrCode.start(
+            { facingMode: { exact: "environment" } },
+            config,
+            onScanSuccess,
+            onScanFailure
+          );
+        } catch {
+          // 2) Fallback más flexible: preferir trasera
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            onScanSuccess,
+            onScanFailure
+          );
         }
-      },
-      () => {
-        // errores de lectura constantes se ignoran, si no se vuelve molesto
+      } catch (e: any) {
+        if (!isMounted) return;
+        setStatus("error");
+        setErrorMsg(e?.message ?? "No se pudo iniciar la cámara");
       }
-    );
+    }
+
+    startScanner();
 
     return () => {
-      scanner.clear().catch(() => {});
+      isMounted = false;
+      html5QrCode
+        .stop()
+        .catch(() => {})
+        .finally(() => {
+          html5QrCode.clear();
+        });
     };
   }, [router]);
 
