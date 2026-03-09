@@ -239,6 +239,96 @@ function findCanonicalFromAliases(
   return undefined;
 }
 
+function extractRegion(beforeAlt: string, detectedState?: string): string | undefined {
+  const cleaned = clean(beforeAlt || "");
+
+  if (!cleaned) return undefined;
+
+  const stopWords = new Set([
+    "origen",
+    "perfil",
+    "sensorial",
+    "ubicado",
+    "en",
+    "la",
+    "el",
+    "los",
+    "las",
+    "zona",
+    "central",
+    "montañosa",
+    "montanosa",
+    "del",
+    "de",
+    "cafe",
+    "café",
+    "especialidad",
+    "blend",
+    "station",
+    "altura",
+    "msnm",
+  ]);
+
+  const stateWords = new Set(
+    MEXICAN_STATES.flatMap((state) =>
+      state
+        .split(/\s+/)
+        .map((part) => normalizeUnicode(part).toLowerCase())
+    )
+  );
+
+  const rawTokens = cleaned
+    .split(/\s+/)
+    .map((t) => t.replace(/[^A-Za-zÁÉÍÓÚÜÑñ\-]/g, ""))
+    .filter(Boolean);
+
+  const filteredTokens = rawTokens.filter((token) => {
+    const low = normalizeUnicode(token).toLowerCase();
+
+    if (stopWords.has(low)) return false;
+    if (stateWords.has(low)) return false;
+
+    return /^[A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑñ\-]{2,}$/.test(token);
+  });
+
+  if (!filteredTokens.length) return undefined;
+
+  // Preferir la última palabra candidata real como región base.
+  // Esto evita errores tipo "Llave Mecacalco".
+  let candidate = filteredTokens[filteredTokens.length - 1];
+
+  // Si hay un patrón muy claro de dos palabras al final, permitimos unirlas,
+  // pero evitamos prefijos ruidosos comunes.
+  if (filteredTokens.length >= 2) {
+    const prev = filteredTokens[filteredTokens.length - 2];
+    const prevLow = normalizeUnicode(prev).toLowerCase();
+
+    const blockedPrefixes = new Set([
+      "llave",
+      "finca",
+      "rancho",
+      "cafetal",
+      "hacienda",
+      "blend",
+      "perfil",
+      "origen",
+    ]);
+
+    if (!blockedPrefixes.has(prevLow)) {
+      const looksLikeCompound =
+        prev.length > 3 &&
+        candidate.length > 3 &&
+        !detectedState;
+
+      if (looksLikeCompound) {
+        candidate = `${prev} ${candidate}`;
+      }
+    }
+  }
+
+  return candidate;
+}
+
 export function parseCoffeeFromText(raw: string): ParsedCoffee {
   const normalizedRaw = normalizeUnicode(raw || "");
   const text = clean(normalizedRaw);
@@ -269,123 +359,13 @@ export function parseCoffeeFromText(raw: string): ParsedCoffee {
     parsed.process = findCanonicalFromAliases(text, PROCESS_ALIASES);
   }
 
-    // Región: tomamos lo último "bonito" antes de Altura
+    // Región: tomamos el mejor candidato antes de Altura
   const beforeAlt = text.split(/Altura/i)[0];
-  if (beforeAlt) {
-    const stop = new Set([
-      "veracruz",
-      "chiapas",
-      "oaxaca",
-      "puebla",
-      "guerrero",
-      "nayarit",
-      "jalisco",
-      "michoacán",
-      "michoacan",
-      "hidalgo",
-      "estado",
-      "méxico",
-      "mexico",
-      "cdmx",
-      "origen",
-      "perfil",
-      "sensorial",
-      "ubicado",
-      "en",
-      "la",
-      "zona",
-      "central",
-      "montañosa",
-      "montanosa",
-      "del",
-      "de",
-      "msnm",
-      "cafe",
-      "café",
-      "especialidad",
-      "blend",
-      "station",
-    ]);
-
-    const tokens = beforeAlt
-      .split(/\s+/)
-      .map((t) => t.replace(/[^A-Za-zÁÉÍÓÚÜÑñ\-]/g, ""))
-      .filter(Boolean);
-
-    const goodTokens = tokens.filter((t) => {
-      const low = t.toLowerCase();
-      const looksLikeName = /^[A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑñ\-]{2,}$/.test(t);
-      return looksLikeName && !stop.has(low);
-    });
-
-    if (goodTokens.length >= 2) {
-      const last = goodTokens[goodTokens.length - 1];
-      const prev = goodTokens[goodTokens.length - 2];
-
-      // Si hay dos palabras buenas seguidas al final, intentamos unirlas
-      parsed.region = `${prev} ${last}`;
-    } else if (goodTokens.length === 1) {
-      parsed.region = goodTokens[0];
-    }
-  }
-
-  // fallback: si no encontramos región con el método anterior, usar el método viejo
-  if (!parsed.region && beforeAlt) {
-    const stop = new Set([
-      "veracruz",
-      "chiapas",
-      "oaxaca",
-      "puebla",
-      "guerrero",
-      "nayarit",
-      "jalisco",
-      "michoacán",
-      "michoacan",
-      "hidalgo",
-      "estado",
-      "méxico",
-      "mexico",
-      "cdmx",
-      "origen",
-      "perfil",
-      "sensorial",
-      "ubicado",
-      "en",
-      "la",
-      "zona",
-      "central",
-      "montañosa",
-      "montanosa",
-      "del",
-      "de",
-      "msnm",
-      "cafe",
-      "café",
-      "especialidad",
-      "blend",
-      "station",
-    ]);
-
-    const tokens = beforeAlt
-      .split(/\s+/)
-      .map((t) => t.replace(/[^A-Za-zÁÉÍÓÚÜÑñ\-]/g, ""))
-      .filter(Boolean);
-
-    for (let i = tokens.length - 1; i >= 0; i--) {
-      const t = tokens[i];
-      const low = t.toLowerCase();
-      const looksLikeName = /^[A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑñ\-]{2,}$/.test(t);
-
-      if (looksLikeName && !stop.has(low)) {
-        parsed.region = t;
-        break;
-      }
-    }
-  }
-
-  // País / origen detectado
   const detectedState = detectMexicanState(text);
 
+  parsed.region = extractRegion(beforeAlt, detectedState); 
+
+   // País / origen detectado
   if (detectedState) {
     parsed.country = "México";
   } else {
