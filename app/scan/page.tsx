@@ -110,7 +110,9 @@ export default function ScanPage() {
             localStorage.setItem("last_pdf_mime", "application/pdf");
 
             setStatusText("Abriendo confirmación...");
-            router.push("/confirm");
+            window.location.assign("/confirm");
+            return;
+
           } catch (e: any) {
             if (!isMounted) return;
             setStatus("error");
@@ -148,15 +150,20 @@ export default function ScanPage() {
 
     startScanner();
 
-    return () => {
-      isMounted = false;
-      html5QrCode
-        .stop()
-        .catch(() => {})
-        .finally(() => {
-          html5QrCode.clear();
-        });
-    };
+return () => {
+  isMounted = false;
+
+  if (html5QrCode.isScanning) {
+    html5QrCode
+      .stop()
+      .catch(() => {})
+      .finally(() => {
+        html5QrCode.clear();
+      });
+  } else {
+    html5QrCode.clear();
+  }
+};
   }, [router]);
 
   return (
