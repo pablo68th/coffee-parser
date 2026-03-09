@@ -22,12 +22,12 @@ function regionFromFilename(filename: string) {
 export default function ConfirmPage() {
   const router = useRouter();
 
-  const [rating, setRating] = useState<RatingLabel | null>(null);
-  const [rawText, setRawText] = useState("");
-  const [filename, setFilename] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+const [rating, setRating] = useState<RatingLabel | null>(null);
+const [rawText, setRawText] = useState("");
+const [filename, setFilename] = useState("");
+const [saving, setSaving] = useState(false);
+const [showDebug, setShowDebug] = useState(false);
+const [isReady, setIsReady] = useState(false);
 
 useEffect(() => {
   const storedText = localStorage.getItem("last_pdf_text") || "";
@@ -39,27 +39,7 @@ useEffect(() => {
   setIsReady(true);
 }, []);
 
-const parsed = isReady ? parseCoffeeFromText(rawText) : {};
-
-const prettyRegion = regionFromFilename(filename);
-const fixedRegion =
-  parsed.region || prettyRegion || "";
-
-  const fixedCoffeeName = (() => {
-  // Respeta tu lógica: origen (región) — proceso
-  const origin = parsed.coffee_name?.split("(")[0]?.trim() || parsed.country || "Café";
-  const regionPart = fixedRegion ? ` (${fixedRegion})` : "";
-  const processPart = parsed.process ? ` — ${parsed.process}` : "";
-  return `${origin}${regionPart}${processPart}`.trim();
-})();
-
-const hasText = !!rawText?.trim();
-
-const displayCoffeeName = hasText
-  ? (fixedCoffeeName || parsed.coffee_name || "Café")
-  : "Café (sin texto) — PDF";
-
-  if (!isReady) {
+if (!isReady) {
   return (
     <main style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
       <h1 style={{ fontSize: 24, fontWeight: "bold" }}>Confirmar café</h1>
@@ -69,6 +49,26 @@ const displayCoffeeName = hasText
     </main>
   );
 }
+
+const parsed = parseCoffeeFromText(rawText);
+
+const prettyRegion = regionFromFilename(filename);
+const fixedRegion = parsed.region || prettyRegion || "";
+
+const originBase = parsed.coffee_name
+  ? parsed.coffee_name.split("(")[0]?.trim()
+  : parsed.country || "Café";
+
+const regionPart = fixedRegion ? ` (${fixedRegion})` : "";
+const processPart = parsed.process ? ` — ${parsed.process}` : "";
+
+const fixedCoffeeName = `${originBase}${regionPart}${processPart}`.trim();
+
+const hasText = !!rawText?.trim();
+
+const displayCoffeeName = hasText
+  ? (fixedCoffeeName || parsed.coffee_name || "Café")
+  : "Café (sin texto) — PDF";
 
   return (
     <main style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
