@@ -28,11 +28,33 @@ function applyCorrection(
   return corrections[normalized] ?? value;
 }
 
+function applyRegionCorrection(value: string | undefined): string | undefined {
+  if (!value) return value;
+
+  const exact = applyCorrection(value, REGION_CORRECTIONS);
+  if (exact && exact !== value) return exact;
+
+  const normalized = normalizeForLookup(value);
+
+  if (normalized.includes("cosautln") || normalized.includes("cosautlan")) {
+    return "Cosautlán";
+  }
+
+  if (normalized.includes("mecacalco")) {
+    return "Mecacalco";
+  }
+
+  return value;
+}
+
 const REGION_CORRECTIONS = buildCorrectionMap({
   "Ixuatln": "Ixhuatlán",
   "Ixhuatlan": "Ixhuatlán",
   "Ixhuatln": "Ixhuatlán",
   "Cosautlan": "Cosautlán",
+  "Cosautln": "Cosautlán",
+  "Llave Mecacalco": "Mecacalco",
+  "Mecacalco": "Mecacalco",
   "Michoacan": "Michoacán",
 });
 
@@ -51,9 +73,9 @@ export function applyParserCorrections<T extends {
   region?: string;
   country?: string;
 }>(parsed: T): T {
-  const correctedRegion = applyCorrection(parsed.region, REGION_CORRECTIONS);
+  const correctedRegion = applyRegionCorrection(parsed.region);
   const correctedCountry = applyCorrection(parsed.country, COUNTRY_CORRECTIONS);
-
+  
   let correctedCoffeeName = parsed.coffee_name;
 
   if (
