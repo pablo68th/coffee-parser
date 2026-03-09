@@ -76,11 +76,43 @@ const VARIETAL_ALIASES: Array<[string, string[]]> = [
 ];
 
 const PROCESS_ALIASES: Array<[string, string[]]> = [
+  ["Barrel Aged Jack Daniel's", [
+    "Barrel Aged Jack Daniel's",
+    "Barrel Aged Jack Daniels",
+    "Jack Daniel's",
+    "Jack Daniels",
+    "Anejado en Barrica",
+    "Añejado en Barrica",
+    "Anejado en Barricas",
+    "Añejado en Barricas",
+  ]],
   ["Natural con Fermentación Anaeróbica", [
     "Natural con Fermentación Anaeróbica",
     "Natural con Fermentacion Anaerobica",
     "Natural Anaeróbico",
     "Natural Anaerobico",
+  ]],
+  ["Natural Fermentado", [
+    "Natural Fermentado",
+    "Fermentado Natural",
+  ]],
+  ["Natural Honey", [
+    "Natural Honey",
+  ]],
+  ["Purple Honey", [
+    "Purple Honey",
+  ]],
+  ["Red Honey", [
+    "Red Honey",
+  ]],
+  ["Yellow Honey", [
+    "Yellow Honey",
+  ]],
+  ["Black Honey", [
+    "Black Honey",
+  ]],
+  ["White Honey", [
+    "White Honey",
   ]],
   ["Lavado", [
     "Lavado",
@@ -95,10 +127,6 @@ const PROCESS_ALIASES: Array<[string, string[]]> = [
   ]],
   ["Honey", [
     "Honey",
-    "Yellow Honey",
-    "Red Honey",
-    "Black Honey",
-    "White Honey",
   ]],
   ["Pulped Natural", [
     "Pulped Natural",
