@@ -27,14 +27,19 @@ export default function ConfirmPage() {
   const [filename, setFilename] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
 useEffect(() => {
-  setRawText(localStorage.getItem("last_pdf_text") || "");
-  setFilename(localStorage.getItem("last_pdf_filename") || "");
-  setRating(null); // ✅ siempre arrancar sin rating
+  const storedText = localStorage.getItem("last_pdf_text") || "";
+  const storedFilename = localStorage.getItem("last_pdf_filename") || "";
+
+  setRawText(storedText);
+  setFilename(storedFilename);
+  setRating(null);
+  setIsReady(true);
 }, []);
 
-const parsed = parseCoffeeFromText(rawText);
+const parsed = isReady ? parseCoffeeFromText(rawText) : {};
 
 const prettyRegion = regionFromFilename(filename);
 const fixedRegion =
@@ -53,6 +58,17 @@ const hasText = !!rawText?.trim();
 const displayCoffeeName = hasText
   ? (fixedCoffeeName || parsed.coffee_name || "Café")
   : "Café (sin texto) — PDF";
+
+  if (!isReady) {
+  return (
+    <main style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
+      <h1 style={{ fontSize: 24, fontWeight: "bold" }}>Confirmar café</h1>
+      <p style={{ marginTop: 8, opacity: 0.8 }}>
+        Cargando datos del PDF...
+      </p>
+    </main>
+  );
+}
 
   return (
     <main style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
