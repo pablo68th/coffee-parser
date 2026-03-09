@@ -103,8 +103,6 @@ if (uploadError) {
 
 localStorage.setItem("last_pdf_storage_path", path);
 localStorage.setItem("last_pdf_mime", "application/pdf");
-
-alert("DEBUG scan storage_path = " + path);
           
           setStatusText("Abriendo confirmación...");
           
