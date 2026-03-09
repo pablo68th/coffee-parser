@@ -29,6 +29,7 @@ const MEXICAN_STATES = [
 
 const VARIETAL_ALIASES: Array<[string, string[]]> = [
   ["Geisha", ["Geisha", "Gesha", "Geisha 1931", "Gesha 1931"]],
+  ["Typica Bourbon", ["Typica Bourbon", "Típica Bourbon"]],
   ["Typica", ["Typica", "Típica"]],
   ["Bourbon", ["Bourbon"]],
   ["Pink Bourbon", ["Pink Bourbon", "Bourbon Rosado", "Pink Bourbón"]],
@@ -76,15 +77,20 @@ const VARIETAL_ALIASES: Array<[string, string[]]> = [
 ];
 
 const PROCESS_ALIASES: Array<[string, string[]]> = [
-  ["Barrel Aged Jack Daniel's", [
+    ["Barrel Aged Jack Daniel's", [
     "Barrel Aged Jack Daniel's",
     "Barrel Aged Jack Daniels",
     "Jack Daniel's",
     "Jack Daniels",
+    "Barrel Aged",
+    "Anejado",
+    "Añejado",
     "Anejado en Barrica",
     "Añejado en Barrica",
     "Anejado en Barricas",
     "Añejado en Barricas",
+    "Jack Daniels Barrel Aged",
+    "Jack Daniels Barrel Aged",
   ]],
   ["Natural con Fermentación Anaeróbica", [
     "Natural con Fermentación Anaeróbica",
