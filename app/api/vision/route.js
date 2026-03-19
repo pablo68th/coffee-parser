@@ -1,0 +1,98 @@
+export const runtime = "nodejs";
+
+export async function GET() {
+  return Response.json({
+    ok: true,
+    message: "vision endpoint is alive",
+  });
+}
+
+export async function POST(req) {
+  try {
+    const body = await req.json();
+    const imageBase64 = body && body.imageBase64;
+
+    if (!imageBase64) {
+      return Response.json(
+        { error: "No image provided" },
+        { status: 400 }
+      );
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return Response.json(
+        { error: "Missing OPENAI_API_KEY in .env.local" },
+        { status: 500 }
+      );
+    }
+
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text:
+                  "Analyze this coffee bag label and extract structured coffee information. " +
+                  "Return ONLY valid JSON with these fields: " +
+                  "coffee_name, country, region, altitude_m, process, varietal, tasting_notes. " +
+                  "Rules: tasting_notes must be an array of strings or null; " +
+                  "altitude_m must be a number or null; " +
+                  "if a field is missing, return null; " +
+                  "do not include explanations; " +
+                  "do not wrap the JSON in markdown.",
+              },
+              {
+                type: "input_image",
+                image_url: "data:image/jpeg;base64," + imageBase64,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return Response.json(
+        {
+          error: (data && data.error && data.error.message) || "OpenAI request failed",
+          raw: data,
+        },
+        { status: response.status }
+      );
+    }
+
+    const output = data && data.output ? data.output : [];
+    let text = "";
+
+    for (const item of output) {
+      const content = item && item.content ? item.content : [];
+      for (const part of content) {
+        if (part && part.type === "output_text" && part.text) {
+          text = part.text;
+          break;
+        }
+      }
+      if (text) break;
+    }
+
+    return Response.json({ ok: true, text: text });
+  } catch (err) {
+    console.error("VISION API ERROR:", err);
+
+    return Response.json(
+      { error: (err && err.message) || "Unknown server error" },
+      { status: 500 }
+    );
+  }
+}
