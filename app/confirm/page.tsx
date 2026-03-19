@@ -19,6 +19,123 @@ function regionFromFilename(filename: string) {
   return "";
 }
 
+const MEXICAN_STATES = [
+  "Veracruz",
+  "Chiapas",
+  "Oaxaca",
+  "Puebla",
+  "Guerrero",
+  "Nayarit",
+  "Jalisco",
+  "Michoacán",
+  "Hidalgo",
+  "Estado de México",
+  "CDMX",
+];
+
+function isMexicanState(value: string | undefined) {
+  if (!value) return false;
+  return MEXICAN_STATES.includes(value);
+}
+
+function findMexicanStateInText(value: string | undefined) {
+  if (!value) return undefined;
+
+  const lower = value.toLowerCase();
+
+  for (const state of MEXICAN_STATES) {
+    if (lower.includes(state.toLowerCase())) {
+      return state;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeCountry(value: string | undefined) {
+  if (!value) return undefined;
+
+  const lower = value.trim().toLowerCase();
+
+  if (lower === "mexico" || lower === "méxico") return "México";
+
+  return value;
+}
+
+function splitVisionRegion(value: string | undefined) {
+  if (!value) {
+    return { originFromRegion: undefined, cleanRegion: "" };
+  }
+
+  const trimmed = value.trim();
+
+  for (const state of MEXICAN_STATES) {
+    const lowerValue = trimmed.toLowerCase();
+    const lowerState = state.toLowerCase();
+
+    if (lowerValue === lowerState) {
+      return {
+        originFromRegion: state,
+        cleanRegion: "",
+      };
+    }
+
+    if (lowerValue.startsWith(lowerState + " ")) {
+      return {
+        originFromRegion: state,
+        cleanRegion: trimmed.slice(state.length).trim(),
+      };
+    }
+
+    if (lowerValue.startsWith(lowerState + ",")) {
+      return {
+        originFromRegion: state,
+        cleanRegion: trimmed.slice(state.length + 1).trim(),
+      };
+    }
+  }
+
+  return {
+    originFromRegion: undefined,
+    cleanRegion: trimmed,
+  };
+}
+
+function parseVisionJson(rawText: string) {
+  try {
+    const data = JSON.parse(rawText || "");
+
+    return {
+      coffee_name:
+        typeof data?.coffee_name === "string" ? data.coffee_name : undefined,
+      country:
+        typeof data?.country === "string" ? data.country : undefined,
+      region:
+        typeof data?.region === "string" ? data.region : undefined,
+      altitude_m:
+        typeof data?.altitude_m === "number"
+          ? data.altitude_m
+          : typeof data?.altitude_m === "string"
+          ? (Number.isNaN(Number(data.altitude_m)) ? undefined : Number(data.altitude_m))
+          : undefined,
+      process:
+        typeof data?.process === "string" ? data.process : undefined,
+      varietal:
+        Array.isArray(data?.varietal)
+          ? data.varietal.join(" ")
+          : typeof data?.varietal === "string"
+          ? data.varietal
+          : undefined,
+      tasting_notes:
+        Array.isArray(data?.tasting_notes)
+          ? data.tasting_notes.filter((x: unknown) => typeof x === "string")
+          : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function ConfirmPage() {
   const router = useRouter();
 
@@ -50,19 +167,61 @@ if (!isReady) {
   );
 }
 
-const parsed = parseCoffeeFromText(rawText);
+const isVisionScan = filename === "vision_scan";
+
+const parsed =
+  isVisionScan
+    ? parseVisionJson(rawText) || {}
+    : parseCoffeeFromText(rawText);
 
 const prettyRegion = regionFromFilename(filename);
-const fixedRegion = parsed.region || prettyRegion || "";
 
-const originBase = parsed.coffee_name
-  ? parsed.coffee_name.split("(")[0]?.trim()
-  : parsed.country || "Café";
+const visionRegionParts = isVisionScan
+  ? splitVisionRegion(parsed.region)
+  : { originFromRegion: undefined, cleanRegion: parsed.region || prettyRegion || "" };
 
-const regionPart = fixedRegion ? ` (${fixedRegion})` : "";
-const processPart = parsed.process ? ` — ${parsed.process}` : "";
+const normalizedCountry = normalizeCountry(parsed.country);
 
-const fixedCoffeeName = `${originBase}${regionPart}${processPart}`.trim();
+const displayState = isVisionScan
+  ? (
+      visionRegionParts.originFromRegion ||
+      findMexicanStateInText(parsed.coffee_name) ||
+      (isMexicanState(parsed.country) ? parsed.country : undefined)
+    )
+  : undefined;
+
+const displayCountry =
+  isVisionScan && (normalizedCountry === "México" || displayState)
+    ? "México"
+    : normalizedCountry || "—";
+
+const fixedRegion =
+  isVisionScan
+    ? (visionRegionParts.cleanRegion || prettyRegion || "")
+    : (parsed.region || prettyRegion || "");
+
+const fixedCoffeeName = (() => {
+  if (isVisionScan) {
+    const originBase =
+      displayState ||
+      normalizedCountry ||
+      "Café";
+
+    const regionPart = fixedRegion ? ` (${fixedRegion})` : "";
+    const processPart = parsed.process ? ` — ${parsed.process}` : "";
+
+    return `${originBase}${regionPart}${processPart}`.trim();
+  }
+
+  const originBase = parsed.coffee_name
+    ? parsed.coffee_name.split("(")[0]?.trim()
+    : parsed.country || "Café";
+
+  const regionPart = fixedRegion ? ` (${fixedRegion})` : "";
+  const processPart = parsed.process ? ` — ${parsed.process}` : "";
+
+  return `${originBase}${regionPart}${processPart}`.trim();
+})();
 
 const hasText = !!rawText?.trim();
 
@@ -118,9 +277,14 @@ const displayCoffeeName = hasText
         </div>
 
         <div style={{ marginTop: 10, fontSize: 14, lineHeight: 1.5 }}>
-          <div><strong>País:</strong> {parsed.country || "—"}</div>
-          <div><strong>Región:</strong> {fixedRegion || "—"}</div>
-          <div><strong>Altitud:</strong> {parsed.altitude_m ?? "—"} m</div>
+                      <div>
+              <strong>País:</strong> {displayCountry}
+            </div>
+                  <div><strong>Región:</strong> {fixedRegion || "—"}</div>
+        {isVisionScan && displayState && (
+          <div><strong>Estado:</strong> {displayState}</div>
+        )}
+        <div><strong>Altitud:</strong> {parsed.altitude_m ?? "—"} m</div>
           <div><strong>Proceso:</strong> {parsed.process || "—"}</div>
           <div><strong>Varietal:</strong> {parsed.varietal || "—"}</div>
           <div style={{ marginTop: 8 }}>
@@ -210,7 +374,7 @@ return;
       user_id: user.id,
       coffee_name: displayCoffeeName ?? null,
       region: fixedRegion ?? null,
-      country: parsed.country ?? null,
+      country: (normalizedCountry ?? parsed.country) ?? null,
       altitude_m: parsed.altitude_m ?? null,
       process: parsed.process ?? null,
       varietal: parsed.varietal ?? null,
@@ -380,4 +544,3 @@ function RatingButton(props: {
     </button>
   );
 }
-

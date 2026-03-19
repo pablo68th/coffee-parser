@@ -43,7 +43,20 @@ export default function VisionPage() {
         throw new Error(data?.error || "Vision request failed");
         }
 
-        setResult(data.text || "No result returned");
+      const text = data.text || "";
+
+      // 👇 Guardamos como si fuera PDF
+      localStorage.setItem("last_pdf_text", text);
+      localStorage.setItem("last_pdf_filename", "vision_scan");
+      localStorage.setItem("last_pdf_storage_path", "");
+      localStorage.setItem("last_pdf_mime", "image/jpeg");
+
+      // opcional (puedes dejarlo o no)
+      setResult(text);
+
+      // 🚀 redirigir a confirm
+      window.location.href = "/confirm";
+
       } catch (err: any) {
         setError(err?.message || "Unknown error");
       } finally {
