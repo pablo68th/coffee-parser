@@ -86,9 +86,11 @@ export default function Home() {
 
   return (
     <main style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: 24, fontWeight: "bold" }}>Subir PDF</h1>
+      <h1 style={{ fontSize: 24, fontWeight: "bold" }}>Agregar café</h1>
 
-      <p style={{ marginTop: 8 }}>Selecciona tu PDF de café (Phase 0: sin OCR).</p>
+      <p style={{ marginTop: 8 }}>
+  Escanea una etiqueta, un QR o sube un PDF para registrar tu café.
+</p>
 
       {/* Input real (oculto) */}
       <input
@@ -117,6 +119,22 @@ export default function Home() {
   onClick={() => router.push("/scan")}
 >
   Escanear QR →
+</button>
+
+<button
+  style={{
+    marginTop: 10,
+    width: "100%",
+    padding: 14,
+    borderRadius: 12,
+    border: "1px solid #ccc",
+    fontWeight: 900,
+    background: "white",
+    color: "#000",
+  }}
+  onClick={() => router.push("/vision")}
+>
+  Escanear etiqueta →
 </button>
 
       {/* Botón: Seleccionar / Cambiar PDF */}
