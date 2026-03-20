@@ -79,6 +79,11 @@ if (assetsError) {
 
 const merged = (coffees || []).map((coffee) => ({
   ...coffee,
+  tasting_notes: Array.isArray(coffee.tasting_notes)
+    ? coffee.tasting_notes
+    : typeof coffee.tasting_notes === "string"
+    ? [coffee.tasting_notes]
+    : [],
   assets: (assets || []).filter((a) => a.coffee_id === coffee.id),
 }));
 
@@ -270,25 +275,29 @@ setItems(merged);
                 </div>
 
                 <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
-                  <div>
-                    <strong>Rating:</strong> {prettyRating(c.rating_label)}
-                  </div>
-                  <div>
-                    <strong>País:</strong> {c.country || "—"}
-                  </div>
-                  <div>
-                    <strong>Región:</strong> {c.region || "—"}
-                  </div>
-                  <div>
-                    <strong>Altitud:</strong> {c.altitude_m ?? "—"} m
-                  </div>
-                  <div>
-                    <strong>Proceso:</strong> {c.process || "—"}
-                  </div>
-                  <div>
-                    <strong>Varietal:</strong> {c.varietal || "—"}
-                  </div>
-                </div>
+              <div>
+                <strong>Rating:</strong> {prettyRating(c.rating_label)}
+              </div>
+              <div>
+                <strong>País:</strong> {c.country || "—"}
+              </div>
+              <div>
+                <strong>Región:</strong> {c.region || "—"}
+              </div>
+              <div>
+                <strong>Altitud:</strong> {c.altitude_m ?? "—"} m
+              </div>
+              <div>
+                <strong>Proceso:</strong> {c.process || "—"}
+              </div>
+              <div>
+                <strong>Varietal:</strong> {c.varietal || "—"}
+              </div>
+              <div>
+                <strong>Notas:</strong>{" "}
+                {c.tasting_notes?.length ? c.tasting_notes.join(", ") : "—"}
+              </div>
+            </div>
 
                 <div style={{ marginTop: 8 }}>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>Cambiar rating:</div>

@@ -41,14 +41,21 @@ export async function POST(req) {
               {
                 type: "input_text",
                 text:
-                  "Analyze this coffee bag label and extract structured coffee information. " +
-                  "Return ONLY valid JSON with these fields: " +
-                  "coffee_name, country, region, altitude_m, process, varietal, tasting_notes. " +
-                  "Rules: tasting_notes must be an array of strings or null; " +
-                  "altitude_m must be a number or null; " +
-                  "if a field is missing, return null; " +
-                  "do not include explanations; " +
-                  "do not wrap the JSON in markdown.",
+                    "Analyze this coffee bag label and extract structured coffee information. " +
+                    "Return ONLY valid JSON with these fields: " +
+                    "coffee_name, country, state, region, altitude_m, process, varietal, tasting_notes. " +
+                    "Important rules: " +
+                    "1) country must be the country, not a state. Example: Mexico. " +
+                    "2) state must be the Mexican state when visible. Example: Veracruz, Puebla, Oaxaca, Chiapas. " +
+                    "3) region must be the smaller locality or municipality when visible. Example: Cosautlán, Zentla, Mecacalco. " +
+                    "4) Do not merge state and region into one field. " +
+                    "5) If only one location is visible and it is clearly a state, put it in state and leave region null. " +
+                    "6) If only one location is visible and it is clearly a smaller locality, put it in region. " +
+                    "7) tasting_notes must be an array of short strings or null. " +
+                    "8) altitude_m must be a number or null. " +
+                    "9) if a field is missing, return null. " +
+                    "10) do not include explanations. " +
+                    "11) do not wrap the JSON in markdown.",
               },
               {
                 type: "input_image",

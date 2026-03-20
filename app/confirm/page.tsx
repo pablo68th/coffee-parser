@@ -106,31 +106,34 @@ function parseVisionJson(rawText: string) {
     const data = JSON.parse(rawText || "");
 
     return {
-      coffee_name:
-        typeof data?.coffee_name === "string" ? data.coffee_name : undefined,
-      country:
-        typeof data?.country === "string" ? data.country : undefined,
-      region:
-        typeof data?.region === "string" ? data.region : undefined,
-      altitude_m:
-        typeof data?.altitude_m === "number"
-          ? data.altitude_m
-          : typeof data?.altitude_m === "string"
-          ? (Number.isNaN(Number(data.altitude_m)) ? undefined : Number(data.altitude_m))
-          : undefined,
-      process:
-        typeof data?.process === "string" ? data.process : undefined,
-      varietal:
-        Array.isArray(data?.varietal)
-          ? data.varietal.join(" ")
-          : typeof data?.varietal === "string"
-          ? data.varietal
-          : undefined,
-      tasting_notes:
-        Array.isArray(data?.tasting_notes)
-          ? data.tasting_notes.filter((x: unknown) => typeof x === "string")
-          : undefined,
-    };
+  coffee_name:
+    typeof data?.coffee_name === "string" ? data.coffee_name : undefined,
+  country:
+    typeof data?.country === "string" ? data.country : undefined,
+  state:
+    typeof data?.state === "string" ? data.state : undefined,
+  region:
+    typeof data?.region === "string" ? data.region : undefined,
+  altitude_m:
+    typeof data?.altitude_m === "number"
+      ? data.altitude_m
+      : typeof data?.altitude_m === "string"
+      ? (Number.isNaN(Number(data.altitude_m)) ? undefined : Number(data.altitude_m))
+      : undefined,
+  process:
+    typeof data?.process === "string" ? data.process : undefined,
+  varietal:
+    Array.isArray(data?.varietal)
+      ? data.varietal.join(" ")
+      : typeof data?.varietal === "string"
+      ? data.varietal
+      : undefined,
+  tasting_notes:
+    Array.isArray(data?.tasting_notes)
+      ? data.tasting_notes.filter((x: unknown) => typeof x === "string")
+      : undefined,
+};
+
   } catch {
     return null;
   }
@@ -184,6 +187,7 @@ const normalizedCountry = normalizeCountry(parsed.country);
 
 const displayState = isVisionScan
   ? (
+      ("state" in parsed && typeof (parsed as any).state === "string" && isMexicanState((parsed as any).state) ? (parsed as any).state : undefined) ||
       visionRegionParts.originFromRegion ||
       findMexicanStateInText(parsed.coffee_name) ||
       (isMexicanState(parsed.country) ? parsed.country : undefined)
@@ -202,15 +206,28 @@ const fixedRegion =
 
 const fixedCoffeeName = (() => {
   if (isVisionScan) {
-    const originBase =
-      displayState ||
-      normalizedCountry ||
-      "Café";
+    const normalizedState =
+      "state" in parsed && parsed.state && isMexicanState(parsed.state) ? parsed.state : undefined;
 
-    const regionPart = fixedRegion ? ` (${fixedRegion})` : "";
-    const processPart = parsed.process ? ` — ${parsed.process}` : "";
+    const normalizedRegion = fixedRegion || "";
 
-    return `${originBase}${regionPart}${processPart}`.trim();
+    if (normalizedState || normalizedRegion) {
+      const originBase = normalizedState || normalizedCountry || "Café";
+      const regionPart = normalizedRegion ? ` (${normalizedRegion})` : "";
+      const processPart = parsed.process ? ` — ${parsed.process}` : "";
+      return `${originBase}${regionPart}${processPart}`.trim();
+    }
+
+    if (parsed.coffee_name) {
+      const processPart = parsed.process ? ` — ${parsed.process}` : "";
+      return `${parsed.coffee_name}${processPart}`.trim();
+    }
+
+    if (parsed.process) {
+      return parsed.process;
+    }
+
+    return "Café";
   }
 
   const originBase = parsed.coffee_name
