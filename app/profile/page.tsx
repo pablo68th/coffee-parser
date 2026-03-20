@@ -102,11 +102,11 @@ export default function ProfilePage() {
       return;
       }
 
-    const { data, error } = await supabase
-      .from("coffees")
-      .select("id, coffee_name, country, process, region, varietal, tasting_notes, rating_label, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+const { data, error } = await supabase
+  .from("coffees")
+  .select("id, coffee_name, country, process, region, varietal, tasting_notes, rating_label, created_at")
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false });
 
       if (error) {
   alert("No se pudo cargar tu perfil: " + error.message);
@@ -312,7 +312,9 @@ function FavoritesSection(props: { rows: CoffeeRow[] }) {
           <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
             {favorites.map((f) => (
               <div key={f.id} style={{ fontSize: 14 }}>
-                <div style={{ fontWeight: 700 }}>{f.coffee_name || f.region || "Café"}</div>
+                <div style={{ fontWeight: 700 }}>
+                  {f.coffee_name || cleanRegionForDisplay(f) || "Café"}
+                </div>
                 <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
                   {extractStateFromRow(f) ? `${extractStateFromRow(f)} · ` : ""}
                   {cleanRegionForDisplay(f) || "—"}
@@ -330,10 +332,15 @@ function FavoritesSection(props: { rows: CoffeeRow[] }) {
           <div style={{ fontWeight: 800, fontSize: 13, opacity: 0.85 }}>🙂 Liked</div>
           <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
             {liked.slice(0, 10).map((f) => (
-                            <div key={f.id} style={{ fontSize: 14 }}>
-                <div style={{ fontWeight: 700 }}>{f.region || "Café"}</div>
+              <div key={f.id} style={{ fontSize: 14 }}>
+                <div style={{ fontWeight: 700 }}>
+                  {f.coffee_name || cleanRegionForDisplay(f) || "Café"}
+                </div>
                 <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
-                  {f.process || "—"}{f.varietal ? ` · ${f.varietal}` : ""}
+                  {extractStateFromRow(f) ? `${extractStateFromRow(f)} · ` : ""}
+                  {cleanRegionForDisplay(f) || "—"}
+                  {f.process ? ` · ${f.process}` : ""}
+                  {f.varietal ? ` · ${f.varietal}` : ""}
                 </div>
               </div>
             ))}
