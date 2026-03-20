@@ -8,6 +8,8 @@ type RatingLabel = "favorite" | "liked" | "neutral" | "disliked";
 
 type CoffeeRow = {
   id: string;
+  coffee_name: string | null;
+  country: string | null;
   process: string | null;
   region: string | null;
   varietal: string | null;
@@ -15,6 +17,49 @@ type CoffeeRow = {
   rating_label: RatingLabel | null;
   created_at: string | null;
 };
+
+const MEXICAN_STATES = [
+  "Veracruz",
+  "Chiapas",
+  "Oaxaca",
+  "Puebla",
+  "Guerrero",
+  "Nayarit",
+  "Jalisco",
+  "Michoacán",
+  "Hidalgo",
+  "Estado de México",
+  "CDMX",
+];
+
+function extractStateFromRow(row: CoffeeRow) {
+  const name = row.coffee_name || "";
+  const region = row.region || "";
+
+  for (const state of MEXICAN_STATES) {
+    if (name.startsWith(state + " (")) return state;
+    if (region.startsWith(state + ", ")) return state;
+    if (region.startsWith(state + " ")) return state;
+    if (row.country === state) return state;
+  }
+
+  return "";
+}
+
+function cleanRegionForDisplay(row: CoffeeRow) {
+  const region = row.region || "";
+
+  for (const state of MEXICAN_STATES) {
+    if (region.startsWith(state + ", ")) {
+      return region.slice(state.length + 2).trim();
+    }
+    if (region.startsWith(state + " ")) {
+      return region.slice(state.length + 1).trim();
+    }
+  }
+
+  return region;
+}
 
 function normalizeKey(s: string) {
   return s
@@ -57,11 +102,11 @@ export default function ProfilePage() {
       return;
       }
 
-      const { data, error } = await supabase
-        .from("coffees")
-        .select("id, process, region, varietal, tasting_notes, rating_label, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("coffees")
+      .select("id, coffee_name, country, process, region, varietal, tasting_notes, rating_label, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
 
       if (error) {
   alert("No se pudo cargar tu perfil: " + error.message);
@@ -81,6 +126,7 @@ export default function ProfilePage() {
     const likedFav = new Set(["liked", "favorite"]);
 
     const processCounts = new Map<string, number>();
+    const stateCounts = new Map<string, number>();
     const regionCounts = new Map<string, number>();
     const varietalCounts = new Map<string, number>();
     const noteCounts = new Map<string, number>();
@@ -95,10 +141,18 @@ for (const r of rows) {
     if (!displayName.has(k)) displayName.set(k, prettyLabel(r.process));
   }
 
-  if (r.region) {
-    const k = normalizeKey(r.region);
+  const derivedState = extractStateFromRow(r);
+  if (derivedState) {
+    const k = normalizeKey(derivedState);
+    inc(stateCounts, k);
+    if (!displayName.has(k)) displayName.set(k, prettyLabel(derivedState));
+  }
+
+  const cleanRegion = cleanRegionForDisplay(r);
+  if (cleanRegion) {
+    const k = normalizeKey(cleanRegion);
     inc(regionCounts, k);
-    if (!displayName.has(k)) displayName.set(k, prettyLabel(r.region));
+    if (!displayName.has(k)) displayName.set(k, prettyLabel(cleanRegion));
   }
 
   if (r.varietal) {
@@ -132,6 +186,7 @@ return {
   totalFavorites: rows.filter((r) => r.rating_label === "favorite").length,
   totalLiked: rows.filter((r) => r.rating_label === "liked").length,
   topProcesses: top(processCounts),
+  topStates: top(stateCounts),
   topRegions: top(regionCounts),
   topVarietals: top(varietalCounts),
   topNotes: top(noteCounts),
@@ -205,12 +260,13 @@ return {
 
       {!loading && rows.length > 0 && (
         <>
-      <>
-        <Section title="Procesos más liked/favorite" items={stats.topProcesses} />
-        <Section title="Regiones más liked/favorite" items={stats.topRegions} />
-        <Section title="Varietales más liked/favorite" items={stats.topVarietals} />
-        <Section title="Notas más frecuentes en liked/favorite" items={stats.topNotes} />
-      </>
+        <>
+          <Section title="Procesos más liked/favorite" items={stats.topProcesses} />
+          <Section title="Estados más liked/favorite" items={stats.topStates} />
+          <Section title="Regiones más liked/favorite" items={stats.topRegions} />
+          <Section title="Varietales más liked/favorite" items={stats.topVarietals} />
+          <Section title="Notas más frecuentes en liked/favorite" items={stats.topNotes} />
+        </>
 
    </>
       )}
@@ -255,10 +311,13 @@ function FavoritesSection(props: { rows: CoffeeRow[] }) {
           <div style={{ fontWeight: 800, fontSize: 13, opacity: 0.85 }}>⭐ Favorites</div>
           <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
             {favorites.map((f) => (
-                            <div key={f.id} style={{ fontSize: 14 }}>
-                <div style={{ fontWeight: 700 }}>{f.region || "Café"}</div>
+              <div key={f.id} style={{ fontSize: 14 }}>
+                <div style={{ fontWeight: 700 }}>{f.coffee_name || f.region || "Café"}</div>
                 <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
-                  {f.process || "—"}{f.varietal ? ` · ${f.varietal}` : ""}
+                  {extractStateFromRow(f) ? `${extractStateFromRow(f)} · ` : ""}
+                  {cleanRegionForDisplay(f) || "—"}
+                  {f.process ? ` · ${f.process}` : ""}
+                  {f.varietal ? ` · ${f.varietal}` : ""}
                 </div>
               </div>
             ))}
