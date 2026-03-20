@@ -11,6 +11,7 @@ type CoffeeRow = {
   process: string | null;
   region: string | null;
   varietal: string | null;
+  tasting_notes: string[] | null;
   rating_label: RatingLabel | null;
   created_at: string | null;
 };
@@ -57,10 +58,10 @@ export default function ProfilePage() {
       }
 
       const { data, error } = await supabase
-      .from("coffees")
-      .select("id, process, region, varietal, rating_label, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+        .from("coffees")
+        .select("id, process, region, varietal, tasting_notes, rating_label, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       if (error) {
   alert("No se pudo cargar tu perfil: " + error.message);
@@ -82,26 +83,39 @@ export default function ProfilePage() {
     const processCounts = new Map<string, number>();
     const regionCounts = new Map<string, number>();
     const varietalCounts = new Map<string, number>();
+    const noteCounts = new Map<string, number>();
     const displayName = new Map<string, string>();
 
-    for (const r of rows) {
-      if (!r.rating_label || !likedFav.has(r.rating_label)) continue;
+for (const r of rows) {
+  if (!r.rating_label || !likedFav.has(r.rating_label)) continue;
 
-      if (r.process) {
-  const k = normalizeKey(r.process);
-  inc(processCounts, k);
-  if (!displayName.has(k)) displayName.set(k, prettyLabel(r.process));
+  if (r.process) {
+    const k = normalizeKey(r.process);
+    inc(processCounts, k);
+    if (!displayName.has(k)) displayName.set(k, prettyLabel(r.process));
+  }
+
+  if (r.region) {
+    const k = normalizeKey(r.region);
+    inc(regionCounts, k);
+    if (!displayName.has(k)) displayName.set(k, prettyLabel(r.region));
+  }
+
+  if (r.varietal) {
+    const k = normalizeKey(r.varietal);
+    inc(varietalCounts, k);
+    if (!displayName.has(k)) displayName.set(k, prettyLabel(r.varietal));
+  }
+
+  if (Array.isArray(r.tasting_notes)) {
+    for (const note of r.tasting_notes) {
+      if (!note) continue;
+      const k = normalizeKey(note);
+      inc(noteCounts, k);
+      if (!displayName.has(k)) displayName.set(k, prettyLabel(note));
+    }
+  }
 }
-if (r.region) {
-  const k = normalizeKey(r.region);
-  inc(regionCounts, k);
-  if (!displayName.has(k)) displayName.set(k, prettyLabel(r.region));
-}
-if (r.varietal) {
-  const k = normalizeKey(r.varietal);
-  inc(varietalCounts, k);
-  if (!displayName.has(k)) displayName.set(k, prettyLabel(r.varietal));
-  }}
 
   const top = (m: Map<string, number>) =>
   Array.from(m.entries())
@@ -120,6 +134,7 @@ return {
   topProcesses: top(processCounts),
   topRegions: top(regionCounts),
   topVarietals: top(varietalCounts),
+  topNotes: top(noteCounts),
   favorites,
 };
 
@@ -190,9 +205,12 @@ return {
 
       {!loading && rows.length > 0 && (
         <>
-          <Section title="Procesos más liked/favorite" items={stats.topProcesses} />
-          <Section title="Regiones más liked/favorite" items={stats.topRegions} />
-          <Section title="Varietales más liked/favorite" items={stats.topVarietals} />
+      <>
+        <Section title="Procesos más liked/favorite" items={stats.topProcesses} />
+        <Section title="Regiones más liked/favorite" items={stats.topRegions} />
+        <Section title="Varietales más liked/favorite" items={stats.topVarietals} />
+        <Section title="Notas más frecuentes en liked/favorite" items={stats.topNotes} />
+      </>
 
    </>
       )}
