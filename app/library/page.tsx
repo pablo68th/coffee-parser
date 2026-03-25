@@ -24,6 +24,51 @@ type CoffeeItem = {
 }[];
 };
 
+const MEXICAN_STATES = [
+  "Veracruz",
+  "Chiapas",
+  "Oaxaca",
+  "Puebla",
+  "Guerrero",
+  "Nayarit",
+  "Jalisco",
+  "Michoacán",
+  "Hidalgo",
+  "Estado de México",
+  "CDMX",
+];
+
+function extractStateFromCoffee(item: CoffeeItem) {
+  const name = (item.coffee_name || "").trim();
+  const region = (item.region || "").trim();
+  const country = (item.country || "").trim();
+
+  for (const state of MEXICAN_STATES) {
+    if (name.startsWith(`${state} (`)) return state;
+    if (name.startsWith(`${state} —`)) return state;
+    if (region.startsWith(`${state}, `)) return state;
+    if (region.startsWith(`${state} `)) return state;
+    if (country === state) return state;
+  }
+
+  return "";
+}
+
+function cleanRegionForDisplay(item: CoffeeItem) {
+  const region = (item.region || "").trim();
+
+  for (const state of MEXICAN_STATES) {
+    if (region.startsWith(`${state}, `)) {
+      return region.slice(state.length + 2).trim();
+    }
+    if (region.startsWith(`${state} `)) {
+      return region.slice(state.length + 1).trim();
+    }
+  }
+
+  return region;
+}
+
 function prettyRating(r?: CoffeeItem["rating_label"]) {
   if (r === "favorite") return "⭐ Favorite";
   if (r === "liked") return "🙂 Liked";
@@ -278,15 +323,20 @@ setItems(merged);
               <div>
                 <strong>Rating:</strong> {prettyRating(c.rating_label)}
               </div>
-              <div>
-                <strong>País:</strong> {c.country || "—"}
-              </div>
-              <div>
-                <strong>Región:</strong> {c.region || "—"}
-              </div>
-              <div>
-                <strong>Altitud:</strong> {c.altitude_m ?? "—"} m
-              </div>
+                <div>
+                  <strong>País:</strong> {c.country || "—"}
+                </div>
+                {extractStateFromCoffee(c) ? (
+                  <div>
+                    <strong>Estado:</strong> {extractStateFromCoffee(c)}
+                  </div>
+                ) : null}
+                <div>
+                  <strong>Región:</strong> {cleanRegionForDisplay(c) || "—"}
+                </div>
+                <div>
+                  <strong>Altitud:</strong> {c.altitude_m ?? "—"} m
+                </div>
               <div>
                 <strong>Proceso:</strong> {c.process || "—"}
               </div>
