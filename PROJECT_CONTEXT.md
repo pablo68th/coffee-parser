@@ -1,387 +1,666 @@
-Aquí tienes una **versión actualizada y completa** del `PROJECT_CONTEXT.md`, ya con **todo lo que traemos hasta hoy**, incluyendo el **nuevo flujo de QR**, el **estado real**, los **bugs** y el **punto exacto donde estamos atorados** (Vercel + pdfjs worker).
+# 🧠 PROJECT CONTEXT — Coffee Tracker App (Phase 0 → MVP Transition)
 
-Puedes copiar/pegar esto tal cual en un chat nuevo y yo voy a entender exactamente dónde quedamos.
+## 0) Executive Summary
 
----
+We are building a **personal coffee tracking app** focused on a **frictionless logging experience**.
 
-# 🧠 PROJECT CONTEXT — Coffee PDF Parser (Phase 0 + QR)
+Current supported inputs:
 
-## 0) Resumen ejecutivo
+* PDF upload
+* QR scan
+* **Vision / label scan from coffee bag image** ← newest major addition
 
-Estamos construyendo una app personal (POC Phase 0) para guardar cafés a partir de PDFs tipo Blend Station de forma ultra frictionless:
+Core flow:
 
-* Upload PDF o Escanear QR → bajar PDF
-* Extraer texto (sin OCR)
-* Parsear campos determinísticos
-* Usuario solo elige rating (favorite/liked/neutral/disliked)
-* Guardar café en Supabase + guardar PDF en Storage + guardar extracción para debug futuro
-* Ver biblioteca y perfil de sabor por agregación simple (no ML)
+* Input coffee source
+* Extract / infer structured data
+* Show Confirm screen
+* User only selects rating
+* Save to Supabase
+* View in Library
+* Build Flavor Profile automatically
 
-**Principios no negociables (Brief):**
+### Non-negotiable product principles
 
-1. Frictionless sobre todo
-2. Guardar jamás se bloquea por datos faltantes
-3. Una acción principal por pantalla
-4. Mobile-first, uso con una mano
-5. Sin forms largos (nunca)
-6. Sistema hace el trabajo, usuario solo confirma
-
----
-
-## 1) Project Goal (Phase 0)
-
-Aplicación para:
-
-* subir PDFs de perfiles de café (Blend Station style)
-* (nuevo) escanear QR que redirige a un PDF → bajarlo → procesarlo igual
-* extraer texto automáticamente (PDF con texto embebido, sin OCR)
-* parsear información estructurada
-* guardar en Supabase
-* construir biblioteca personal
-* generar perfil de sabor del usuario (agregación simple)
+1. Frictionless above all else
+2. Saving must never be blocked by missing data
+3. One primary action per screen
+4. Mobile-first
+5. No long forms
+6. System does the work, user only confirms
 
 ---
 
-## 2) Stack actual
+# 1) Current Product Goal
+
+The app is evolving from a **PDF-based POC** into a **multi-input coffee ingestion system**.
+
+Original Phase 0 goal:
+
+* Parse Blend Station PDFs and save coffees
+
+Current broader direction:
+
+* Support multiple input methods
+* Reduce dependency on third-party PDFs
+* Move toward **label scanning as the primary ingestion method**
+* Keep the same Confirm → Save UX regardless of input
+
+---
+
+# 2) Current Stack
 
 Frontend:
 
-* Next.js App Router (Next 16.x con Turbopack)
+* Next.js App Router
+* React
 * TypeScript
-* React Client Components
+* Client Components
 
 Backend:
 
-* Next API Routes en `app/api/.../route.ts`
-* Endpoint de extracción usa **pdfjs-dist** (se migró desde pdf-parse durante debugging en Vercel)
+* Next route handlers in `app/api/...`
 
-DB:
+Infra:
 
-* Supabase Postgres
+* Supabase
 
-Storage:
+  * Postgres
+  * Storage
+  * Auth
 
-* Supabase Storage bucket: `coffee-pdfs`
-* Path: `pdfs/{timestamp}_{sanitized_filename}.pdf`
-* Sanitización storage keys: quitar acentos, unicode, etc.
+Parsing:
 
----
+* Deterministic parser for PDFs (`lib/parseCoffee.ts`)
+* Vision-based structured extraction via OpenAI API
 
-## 3) Estructura de la app (rutas)
+PDF extraction:
 
-### Home `/`
+* `pdfjs-dist`
 
-Objetivo: subir PDF (por ahora con botón “Seleccionar PDF” + “Continuar” como acción principal).
+QR:
 
-Flujo:
+* `html5-qrcode`
 
-1. seleccionar PDF
-2. POST `/api/extract-text` con FormData(file)
-3. subir PDF a Supabase Storage bucket `coffee-pdfs` con path sanitizado
-4. guardar en localStorage:
+Deploy:
 
-   * `last_pdf_text`
-   * `last_pdf_filename`
-   * `last_pdf_storage_path`
-   * `last_pdf_mime`
-5. push a `/confirm`
-
-UI: se han removido la mayoría de debugs; solo errores.
+* Vercel
 
 ---
 
-### Scan `/scan` (NUEVO)
+# 3) Current App Routes
 
-Objetivo: escanear QR desde el teléfono.
+## `/`
 
-Flujo:
+Home screen
 
-1. `html5-qrcode` detecta QR
-2. QR contiene una URL (en la práctica suele ser Google Drive `.../file/d/<id>/view`)
-3. La app llama un endpoint server: `POST /api/extract-text/fetch-pdf` para bajar el PDF (porque desde el browser hay CORS/Drive issues)
-4. Una vez obtenido el PDF como blob:
+Now acts as the **main ingestion hub**.
 
-   * Se manda a `/api/extract-text` para extraer texto
-   * Se sube el PDF a Supabase Storage (ideal: siempre)
-   * Se setean los mismos localStorage keys que en Home
-   * Se redirige a `/confirm`
+Current / intended options:
 
-Estado: la ruta existe y ya no es 404/405; el problema actual es el parsing en Vercel (pdf.js worker / DOMMatrix).
+* Upload PDF
+* Scan QR
+* **Scan label / vision**
+* Go to Library
 
----
+Recommended wording:
 
-### API `/api/extract-text` (CRÍTICO)
-
-Responsabilidad:
-
-* recibir FormData con `file`
-* convertir a bytes
-* extraer texto
-* retornar JSON `{ ok: true, text, meta }`
-
-Situación:
-
-* Antes se usaba `pdf-parse`.
-* Se migró a `pdfjs-dist/legacy/build/pdf.mjs` durante debugging de Vercel.
-* Problemas encontrados:
-
-  * `DOMMatrix is not defined` (pdf.js intenta API de browser)
-  * “Setting up fake worker failed: Cannot find module ... pdf.worker.mjs in .next/chunks”
-  * “Cannot find module pdfjs-dist/legacy/build/pdf.js” (no existe en esa versión instalada)
-  * Error Turbopack: `require.resolve(...)` regresa número tipo 65956 en lugar de ruta
-
-**Estado actual:** endpoint aún inestable en Vercel por worker/paths; se estaban probando soluciones para forzar worker en Node.
+* Title should be more like `Agregar café` instead of `Subir PDF`
 
 ---
 
-### API `/api/extract-text/fetch-pdf` (NUEVO)
+## `/scan`
 
-Responsabilidad:
+QR scanning flow
 
-* Recibir `{ url }`
-* Si es Google Drive, extraer `fileId`
-* Probar bajar PDF con:
+Flow:
 
-  * `drive.usercontent.google.com/download?id=...&export=download`
-  * `drive.google.com/uc?export=download&id=...`
-* Manejar HTML de confirm (token `confirm=`) + cookies
-* Retornar PDF como `application/pdf` + header `x-filename`
+1. Scan QR
+2. QR resolves to URL
+3. Server downloads PDF through `fetch-pdf`
+4. PDF gets parsed
+5. Data goes to Confirm
+6. Save
 
-Estado:
+Status:
 
-* Ya responde (ya no 404)
-* Antes devolvía “Drive respondió status 500” con links de Drive
-* Se endureció con fallback y confirm token
-* El bloqueo principal ahora no es descarga, es el parsing del PDF en `/api/extract-text`
+* Works, but QR is no longer considered a strategic primary input
+* Blend Station appears to be moving away from QR in newer packaging
 
----
+Conclusion:
 
-### Confirm `/confirm`
-
-Responsabilidad:
-
-* leer localStorage (`last_pdf_text`, `last_pdf_filename`, `last_pdf_storage_path`, `last_pdf_mime`)
-* `parseCoffeeFromText(rawText)` produce objeto parsed
-* mostrar card
-* usuario elige rating: `favorite | liked | neutral | disliked`
-* Guardar:
-
-**Guardar en DB:**
-
-1. insert `coffees` con:
-
-   * `coffee_name` generado (estado (región) — proceso)
-   * `country, region, altitude_m, process, varietal, tasting_notes`
-   * rating_label/score, is_favorite
-   * `source_type`, `parser_version`
-   * `search_text`
-2. insert en `assets` si hay `storage_path`:
-
-   * `coffee_id`, `asset_type="pdf"`, `storage_path`, `original_filename`, `mime_type`
-3. insert en `extractions` (debug parsing futuro):
-
-   * `coffee_id`, `raw_text`, `parsed_json`, `parser_version`
-   * Si falla, NO bloquea.
-
-Anti-duplicados:
-
-* Se implementó control para evitar duplicados (hubo bug donde se guardaba 3 veces).
-* En algún momento se hizo check por raw_text en extractions para no duplicar.
-
-UI:
-
-* Se movieron/ocultaron debugs. Debug de “texto extraído” se pidió que quede al final, discreto (expandible).
+* Keep as fallback / legacy support
+* Not primary MVP direction
 
 ---
 
-### Library `/library`
+## `/vision`
 
-Carga:
+**New Vision / label scan route**
 
-* `supabase.from("coffees").select("*, assets(...)").order("created_at", { ascending: false })`
+Current behavior:
 
-Features:
+* User uploads a coffee bag image
+* App sends image to `/api/vision`
+* OpenAI Vision returns structured JSON
+* Result is stored in localStorage
+* Redirects to `/confirm`
 
-* search (usando `search_text`)
-* delete individual
-* reset library (confirm dialog)
-* abrir PDF desde Storage (`getPublicUrl`)
-* (nuevo) cambiar rating desde library (update)
-
-  * hubo error “Too many re-renders” por `setToast` fuera de handlers; se corrigió después moviéndolo dentro del flujo correcto
-  * se eliminó debug (id visible etc.)
+This is now the **most promising ingestion path for the MVP**.
 
 ---
 
-### Profile `/profile`
+## `/confirm`
 
-Agregación simple basada en coffees:
+Central confirmation screen
 
-* top procesos liked/favorite
-* top regiones liked/favorite
-* top varietales liked/favorite
+This screen now supports **two different input modes**:
 
-Sin ML.
+### PDF mode
 
----
+* Uses `parseCoffeeFromText(rawText)`
 
-## 4) Supabase Schema
+### Vision mode
 
-### Table: coffees
+* Detects `filename === "vision_scan"`
+* Parses structured JSON via `parseVisionJson(rawText)`
 
-Campos:
+Then the screen:
 
-* id (uuid)
+* normalizes country / state / region
+* builds a normalized coffee display name
+* shows country / state / region / altitude / process / varietal / notes
+* asks only for rating
+* saves coffee
+
+### Confirm naming rule
+
+Normalized name format should be consistent across all ingestion methods:
+
+```text
+Estado (Región) — Proceso
+```
+
+Examples:
+
+* `Veracruz (Mecacalco) — Purple Honey`
+* `Veracruz (Cosautlán) — Natural Fermentado`
+
+Fallback for special coffees with no location:
+
+* If no state/region available, use best available coffee name
+* Example:
+
+  * `Jack Daniel's Amazing Coffee — Barrel Aged`
+
+### Confirm state handling
+
+A derived `Estado` line is shown when possible.
+
+State is inferred from:
+
+* explicit vision `state`
+* region patterns
 * coffee_name
+* final display name
+
+This lets Confirm show:
+
+```text
+País: México
+Estado: Veracruz
+Región: Cosautlán
+```
+
+without requiring a DB schema change yet.
+
+---
+
+## `/library`
+
+Personal coffee library
+
+Current features:
+
+* Load coffees from Supabase
+* Load assets separately and merge
+* Search via `search_text`
+* Delete single coffee
+* Reset library
+* Change rating
+* Open stored PDF when available
+
+### Current display
+
+Each coffee card shows:
+
+* normalized coffee_name
+* rating
 * country
 * region
-* altitude_m
+* altitude
 * process
 * varietal
-* tasting_notes (array / json)
-* rating_label
-* rating_score
-* is_favorite
-* source_type
-* parser_version
-* search_text
-* created_at
+* **tasting notes now visible**
 
-### Table: assets
+### Notes
 
-Campos:
+Notes are now being rendered and already confirmed working.
 
-* id
-* coffee_id (FK)
-* asset_type = "pdf"
-* storage_path
-* original_filename
-* mime_type
-* created_at
+### Pending / partially implemented
 
-### Table: extractions (YA CREADA)
-
-Campos recomendados (ajustado a errores previos):
-
-* id
-* coffee_id (FK)
-* parser_version
-* raw_text
-* parsed_json
-* created_at
-
-Notas:
-
-* Hubo errores de schema cache porque se intentó insertar columnas que NO existían (`mime_type`, `original_filename`). Se arregló alineando columnas.
+* Derived `Estado` should also be visible in Library when it can be inferred from `coffee_name` or region structure
+* This has been partially attempted and may still need final polish
 
 ---
 
-## 5) Parser (lib/parseCoffee.ts)
+## `/profile`
 
-Exports:
+Flavor Profile
 
-* `PARSER_VERSION = "blend_station_pdf_v1"`
-* `SOURCE_TYPE = "blend_station_pdf"`
-* `parseCoffeeFromText(raw)`
+Current aggregation uses:
 
-Reglas:
+* favorite
+* liked
 
-* Altura: `Altura XXXX msnm`
-* Proceso: Natural / Lavado / Honey / “Natural con Fermentación Anaeróbica”
-* Región: suele venir antes de “Altura”; regex/tokens
-* Origen: estado mexicano > país detectado > fallback
-* coffee_name: `Origen (Región) — Proceso`
+Sections currently supported:
 
-Notas:
+* top processes
+* top states
+* top regions
+* top varietals
+* top tasting notes
 
-* Tasting notes: los PDFs nuevos NO traen notas en texto (están en gráfica/imagen). Entonces `tasting_notes` a veces será vacío y eso está OK (brief: no bloquear).
+### Important recent improvement
 
----
+Profile now includes **tasting notes**, which was missing before.
 
-## 6) Bugs y fixes históricos relevantes
+### Important recent fix
 
-Resueltos:
+Profile now uses the real `coffee_name` in favorites/liked cards, instead of falling back to just region or `"Café"`.
 
-* acentos rompiendo keys de Storage → filename sanitization
-* doble/triple guardado → controlado
-* región no parseada → regex actualizado
-* confirm dialog antes de borrar
-* insert assets usando returned coffee id
-* env vars supabase missing
-* errores de `extractions` por columnas inexistentes → schema alineado
-* search_text migration: hubo error `array_to_string(jsonb...)` y se corrigió (casting)
+This fixed cases like:
 
-Pendientes/actuales (HOY):
+* Jack Daniel’s coffee showing as `"Café"` before
+* now should show real saved coffee name
 
-* **QR flow funciona hasta descargar, pero Vercel falla al extraer texto**:
+### Pending / partially implemented
 
-  * `DOMMatrix is not defined`
-  * `Setting up fake worker failed: cannot find pdf.worker.mjs in .next/chunks`
-  * intentos de arreglar worker path con `require.resolve` fallaron porque Turbopack regresaba número
-  * intento de usar `pdf.js` legacy .js falló porque no existe en esa versión instalada
+* confirm that derived `Estado` is consistently shown or reflected where needed
+* ensure Library and Profile stay consistent for naming / state / region formatting
 
 ---
 
-## 7) Deploy / Mobile testing
+# 4) Supabase Schema
 
-* Se desplegó en Vercel: `https://coffee-parser.vercel.app`
-* Motivo: cámara en iPhone requiere HTTPS (no HTTP local IP)
-* GitHub deploy ya conectado
-* Problema recurrente: cambios sí deployan (Ready), pero se prueba en phone con query param `?v=N` para evitar cache.
+## `coffees`
 
----
+Current fields used:
 
-## 8) Estado actual (WORKING vs BROKEN)
+* `id`
+* `user_id`
+* `created_at`
+* `source_type`
+* `parser_version`
+* `coffee_name`
+* `country`
+* `region`
+* `altitude_m`
+* `process`
+* `varietal`
+* `tasting_notes`
+* `rating_label`
+* `rating_score`
+* `is_favorite`
+* `search_text`
 
-WORKING:
+### Important note
 
-* Upload PDF desde Home → Confirm → Save coffee/assets/extractions → Library/Profile
-* Library/Profile limpias sin debugs
-* Search funcionando con `search_text`
-* Update rating desde library (ya se buscó implementar)
+There is **no dedicated `state` column yet**.
 
-BROKEN / In progress:
+For now:
 
-* Scan QR end-to-end en producción:
+* state is derived in UI and from naming logic
+* region stores the true locality/region when possible
+* coffee_name encodes state + region for consistency
 
-  * descarga de Drive ya se atacó con endpoint fetch-pdf
-  * el parsing/extract-text en Vercel es el bloqueo principal (pdfjs worker/DOMMatrix)
+Possible future DB improvement:
 
----
-
-## 9) Next steps (prioridad)
-
-P0 (bloqueante):
-
-1. estabilizar `/api/extract-text` en Vercel para que funcione con PDFs descargados de Drive
-
-   * solución ideal: extracción sin worker o empaquetado correcto del worker en serverless
-
-P1:
-2) UI mejor: Home con selección + botón continuar habilitado; confirm con debug discreto al final
-3) mejorar naming consistente (sin depender de filename)
-4) permitir re-calificar un café (update rating) sin borrar y resubir
+* add `state` or `origin_state` field
 
 ---
 
-## 🔟 Mental model del flujo
+## `assets`
 
-### Upload:
+Used to store original file references:
 
-`Home Upload → /api/extract-text → Storage upload → localStorage → Confirm → Save coffees/assets/extractions → Library/Profile`
+* pdf only for now
 
-### QR:
+Fields:
 
-`Scan QR → /api/extract-text/fetch-pdf → /api/extract-text → Storage upload → localStorage → Confirm → Save ...`
+* `id`
+* `user_id`
+* `coffee_id`
+* `asset_type`
+* `storage_path`
+* `original_filename`
+* `mime_type`
+* `created_at`
 
 ---
 
-## Información clave adicional (para continuar rápido)
+## `extractions`
 
-* Repo tiene `app/api/extract-text/route.ts`
-* Y `app/api/extract-text/fetch-pdf/route.ts`
-* Actualmente fetch desde scan debe llamar `/api/extract-text/fetch-pdf` (no `/api/fetch-pdf`)
-* Error actual visto en teléfono: problemas de worker / DOMMatrix durante extract-text.
+Used for debugging and future parser evolution
+
+Fields:
+
+* `id`
+* `user_id`
+* `coffee_id`
+* `parser_version`
+* `raw_text`
+* `parsed_json`
+* `created_at`
+
+---
+
+# 5) Current Parsing System
+
+## PDF parsing
+
+Main file:
+
+* `lib/parseCoffee.ts`
+
+Handles:
+
+* altitude
+* process
+* region
+* country
+* varietal
+* tasting notes when available as text
+
+Includes:
+
+* correction layer
+* canonical aliases
+* compound processes
+* compound varietals
+* normalized naming
+
+Examples of fixed cases:
+
+* `Ixhuatlán`
+* `Cosautlán`
+* `Mecacalco`
+* `Purple Honey`
+* `Natural Fermentado`
+* `Typica Bourbon`
+* `Barrel Aged Jack Daniel's`
+
+---
+
+## Vision parsing
+
+Current route:
+
+* `app/api/vision/route.js`
+
+Current test page:
+
+* `app/vision/page.tsx`
+
+Vision flow:
+
+1. image upload
+2. send image to OpenAI Responses API
+3. ask for structured JSON:
+
+   * `coffee_name`
+   * `country`
+   * `state`
+   * `region`
+   * `altitude_m`
+   * `process`
+   * `varietal`
+   * `tasting_notes`
+4. localStorage
+5. redirect to Confirm
+
+### Important current insight
+
+Vision is now viable enough to be considered the **primary ingestion path for MVP**, with:
+
+* QR as fallback
+* URL parsing as possible secondary path
+* PDF as legacy support
+
+---
+
+# 6) Multi-Input Product Direction
+
+The product is no longer “just a PDF parser”.
+
+Current intended architecture:
+
+```text
+Scan Label / Scan QR / Paste URL / Upload PDF
+↓
+Extraction layer
+↓
+Structured Coffee Object
+↓
+Confirm
+↓
+Save
+↓
+Library / Profile
+```
+
+### Strategic recommendation from spike
+
+Primary input:
+
+* **Label scanning (Vision)**
+
+Secondary:
+
+* URL parsing
+
+Legacy / fallback:
+
+* QR
+* PDF
+
+Why:
+
+* PDFs are high-risk because they depend on third-party behavior
+* QR usage appears to be decreasing
+* labels always exist on the physical product
+* Vision best matches frictionless UX
+
+---
+
+# 7) Spike Results (Important Product Context)
+
+## Label scanning
+
+Tested with real coffee bags.
+
+Result:
+
+* highly viable
+* structured coffee information is visible on packaging
+* confirm step can correct small mistakes
+* best frictionless candidate
+
+## QR
+
+Findings:
+
+* Blend Station QR historically pointed to Drive PDFs
+* newer packaging may not include QR anymore
+* owner apparently is not changing this despite customer complaints
+
+Conclusion:
+
+* QR is not strategic as primary ingestion
+
+## URL parsing
+
+Still in plan as secondary method
+
+* viable when product page exists
+* lower friction than manual entry, but less frictionless than label scan
+* not yet fully implemented
+
+---
+
+# 8) Current Known Behavior / Edge Cases
+
+## Working well
+
+* Vision → Confirm → Save flow
+* Notes save and now appear in Profile
+* Real coffee names appear in Profile instead of generic fallback
+* Vision can correctly infer coffee data from real bags
+
+## Special case handling
+
+### Jack Daniel’s / barrel aged coffee
+
+* may not have state/region/altitude/notes
+* should still save correctly
+* if no location exists, use best available `coffee_name`
+* Example desired behavior:
+
+  * `Jack Daniel's Amazing Coffee — Barrel Aged`
+
+### Location structure
+
+Desired representation:
+
+* `País: México`
+* `Estado: Veracruz`
+* `Región: Cosautlán`
+
+Not:
+
+* `Región: Veracruz, Cosautlán`
+
+State should be separate whenever possible.
+
+---
+
+# 9) Current Bugs / Pending UI Polish
+
+## Confirm
+
+* Confirm state display was broken at one point, then fixed by deriving state from normalized display name
+* currently expected to show Estado when derivable
+
+## Library
+
+* tasting notes now confirmed working
+* **Estado display may still need final polish / verification**
+
+## Profile
+
+* coffee_name display fixed
+* notes now included
+* state section included
+* needs consistency check against Library / Confirm
+
+## Vision UI
+
+Current `/vision` route is functional but basic.
+It still needs:
+
+* nicer UX
+* buttons / layout at the level of QR scan screen
+* image upload/preview polish
+* more polished loading and result handling
+
+This is **in the queue**, but not the current highest priority until extraction is fully validated across real bags.
+
+---
+
+# 10) Home / Entry Point Status
+
+Home currently exists but needs product-level polish.
+
+Recommended Home should expose:
+
+* `Escanear etiqueta`
+* `Escanear QR`
+* `Seleccionar PDF`
+* `Ver biblioteca`
+
+Vision should be easier to access from Home instead of manually typing `/vision`.
+
+This has been discussed and should be implemented soon.
+
+---
+
+# 11) Immediate Current Priorities
+
+## Highest priority now
+
+1. Test Vision with all real coffee bags
+2. Report edge cases
+3. Improve prompt / normalization / fallbacks
+4. Confirm consistency across Confirm / Library / Profile
+
+## Next after that
+
+5. Add polished Vision UI similar to QR UI
+6. Surface Vision clearly on Home
+7. Continue multi-input architecture cleanup
+
+## Later
+
+8. URL parsing
+9. Potential DB support for `state`
+10. camera-native Vision UI (instead of only file upload)
+
+---
+
+# 12) Current Instruction Style Preference
+
+When continuing this project:
+
+* explain step by step
+* always say exactly which file to open
+* exactly what to replace
+* avoid assuming advanced dev knowledge
+* speak plainly
+* avoid vague “you can just...” wording
+
+---
+
+# 13) Recommended Next Action in New Conversation
+
+Continue from:
+
+* **Vision real-bag testing**
+* then fix remaining extraction / normalization edge cases
+* then move into Vision UI polish + Home integration
+
+---
+
+# 14) Important Reminder
+
+After meaningful stable changes, remind me to run:
+
+```bash
+git add .
+git commit -m "message"
+git push
+```
+
+because I often forget to update GitHub unless explicitly reminded.
 
 ---
 

@@ -231,15 +231,29 @@ export default function ConfirmPage() {
 
       const normalizedRegion = fixedRegion || "";
 
-      if (normalizedState || normalizedRegion) {
-        const originBase =
-          normalizedState ||
-          (normalizedCountry && normalizedCountry !== "México" ? normalizedCountry : "Café");
+    if (normalizedState || normalizedRegion) {
+      const originBase =
+        normalizedState ||
+        (normalizedCountry && normalizedCountry !== "México" ? normalizedCountry : "Café");
 
-        const regionPart = normalizedRegion ? ` (${normalizedRegion})` : "";
-        const processPart = parsed.process ? ` — ${parsed.process}` : "";
-        return `${originBase}${regionPart}${processPart}`.trim();
-      }
+      const regionPart = normalizedRegion ? ` (${normalizedRegion})` : "";
+      const processPart = parsed.process ? ` — ${parsed.process}` : "";
+
+      const rawVisionName = (parsed.coffee_name || "").trim();
+
+      const lowerVisionName = rawVisionName.toLowerCase();
+      const isRedundantVisionName =
+        !rawVisionName ||
+        lowerVisionName === originBase.toLowerCase() ||
+        lowerVisionName === normalizedRegion.toLowerCase() ||
+        lowerVisionName === parsed.process?.toLowerCase() ||
+        lowerVisionName.includes(originBase.toLowerCase()) ||
+        (normalizedRegion && lowerVisionName.includes(normalizedRegion.toLowerCase()));
+
+      const qualifierPart = !isRedundantVisionName ? ` — ${rawVisionName}` : "";
+
+      return `${originBase}${regionPart}${processPart}${qualifierPart}`.trim();
+    }
 
       if (parsed.coffee_name) {
         const processPart = parsed.process ? ` — ${parsed.process}` : "";

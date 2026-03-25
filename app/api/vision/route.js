@@ -38,9 +38,10 @@ export async function POST(req) {
           {
             role: "user",
             content: [
-              {
-                type: "input_text",
-                text:
+              
+                {
+                  type: "input_text",
+                  text:
                     "Analyze this coffee bag label and extract structured coffee information. " +
                     "Return ONLY valid JSON with these fields: " +
                     "coffee_name, country, state, region, altitude_m, process, varietal, tasting_notes. " +
@@ -53,11 +54,17 @@ export async function POST(req) {
                     "6) If only one location is visible and it is clearly a smaller locality, put it in region. " +
                     "7) tasting_notes must be an array of short strings or null. " +
                     "8) altitude_m must be a number or null. " +
-                    "9) if a field is missing, return null. " +
-                    "10) do not include explanations. " +
-                    "11) do not wrap the JSON in markdown.",
-              },
-              {
+                    "9) Always try to extract a meaningful coffee_name. coffee_name should not be null unless absolutely impossible. " +
+                    "10) If a clear product name is visible, use it as coffee_name. " +
+                    "11) If no explicit product name exists, build coffee_name from the best available origin and/or process information. " +
+                    "12) If enough information exists, do not leave coffee_name null. " +
+                    "13) If varietals appear together as a known combined name, keep them together as one value. Example: Typica Bourbon. " +
+                    "14) Do not split a combined varietal into separate unrelated entries if the label suggests a single combined varietal. " +
+                    "15) If a field is missing, return null. " +
+                    "16) do not include explanations. " +
+                    "17) do not wrap the JSON in markdown.",
+                },
+                              {
                 type: "input_image",
                 image_url: "data:image/jpeg;base64," + imageBase64,
               },
