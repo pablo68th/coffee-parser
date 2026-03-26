@@ -83,6 +83,94 @@ function normalizeCountry(value: string | undefined) {
   return value;
 }
 
+function cleanVisionQualifier(params: {
+  rawVisionName: string;
+  state?: string;
+  region?: string;
+  process?: string;
+}) {
+  const { rawVisionName, state, region, process } = params;
+
+  const original = (rawVisionName || "").trim();
+  if (!original) return "";
+
+  const collapseSpaces = (value: string) =>
+    value
+      .replace(/\s+/g, " ")
+      .replace(/[\-—,]+$/g, "")
+      .trim();
+
+  const normalizeLoose = (value: string) =>
+    collapseSpaces(value)
+      .toLowerCase()
+      .replace(/[()\-—,]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const escapeRegExp = (value: string) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  const stateClean = collapseSpaces(state || "");
+  const regionClean = collapseSpaces(region || "");
+  const processClean = collapseSpaces(process || "");
+
+  let cleaned = collapseSpaces(original);
+
+  // 1) Si todo el nombre ya es solo una combinación redundante, no agregar qualifier.
+  const fullyRedundantPhrases = [
+    [stateClean, regionClean, processClean].filter(Boolean).join(" "),
+    [regionClean, stateClean, processClean].filter(Boolean).join(" "),
+    [stateClean, regionClean].filter(Boolean).join(" "),
+    [regionClean, stateClean].filter(Boolean).join(" "),
+    [stateClean, processClean].filter(Boolean).join(" "),
+    [regionClean, processClean].filter(Boolean).join(" "),
+    stateClean,
+    regionClean,
+    processClean,
+  ]
+    .map(collapseSpaces)
+    .filter(Boolean);
+
+  const normalizedCleaned = normalizeLoose(cleaned);
+
+  if (
+    fullyRedundantPhrases.some(
+      (phrase) => normalizeLoose(phrase) === normalizedCleaned
+    )
+  ) {
+    return "";
+  }
+
+  // 2) Solo quitar colas redundantes si vienen claramente separadas
+  // por guion largo, guion normal o coma.
+  // Esto evita romper frases válidas como "Antiguo Camino a Naolinco".
+  const trailingSeparatedPhrases = [
+    [stateClean, regionClean, processClean].filter(Boolean).join(" "),
+    [regionClean, stateClean, processClean].filter(Boolean).join(" "),
+    [stateClean, regionClean].filter(Boolean).join(" "),
+    [regionClean, stateClean].filter(Boolean).join(" "),
+    [stateClean, processClean].filter(Boolean).join(" "),
+    [regionClean, processClean].filter(Boolean).join(" "),
+    processClean,
+  ]
+    .map(collapseSpaces)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+
+  for (const phrase of trailingSeparatedPhrases) {
+    const escapedPhrase = escapeRegExp(phrase);
+
+    cleaned = cleaned.replace(
+      new RegExp(`\\s*([,\\-—])\\s*${escapedPhrase}$`, "i"),
+      ""
+    );
+
+    cleaned = collapseSpaces(cleaned);
+  }
+
+  return cleaned;
+}
+
 function splitVisionRegion(value: string | undefined) {
   if (!value) {
     return { originFromRegion: undefined as string | undefined, cleanRegion: "" };
@@ -239,20 +327,18 @@ export default function ConfirmPage() {
       const regionPart = normalizedRegion ? ` (${normalizedRegion})` : "";
       const processPart = parsed.process ? ` — ${parsed.process}` : "";
 
-      const rawVisionName = (parsed.coffee_name || "").trim();
+const rawVisionName = (parsed.coffee_name || "").trim();
 
-      const lowerVisionName = rawVisionName.toLowerCase();
-      const isRedundantVisionName =
-        !rawVisionName ||
-        lowerVisionName === originBase.toLowerCase() ||
-        lowerVisionName === normalizedRegion.toLowerCase() ||
-        lowerVisionName === parsed.process?.toLowerCase() ||
-        lowerVisionName.includes(originBase.toLowerCase()) ||
-        (normalizedRegion && lowerVisionName.includes(normalizedRegion.toLowerCase()));
+const cleanedVisionName = cleanVisionQualifier({
+  rawVisionName,
+  state: normalizedState,
+  region: normalizedRegion,
+  process: parsed.process,
+});
 
-      const qualifierPart = !isRedundantVisionName ? ` — ${rawVisionName}` : "";
+const qualifierPart = cleanedVisionName ? ` — ${cleanedVisionName}` : "";
 
-      return `${originBase}${regionPart}${processPart}${qualifierPart}`.trim();
+return `${originBase}${regionPart}${processPart}${qualifierPart}`.trim();
     }
 
       if (parsed.coffee_name) {

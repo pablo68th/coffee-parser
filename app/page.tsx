@@ -88,8 +88,12 @@ export default function Home() {
     <main style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
       <h1 style={{ fontSize: 24, fontWeight: "bold" }}>Agregar café</h1>
 
-      <p style={{ marginTop: 8 }}>
-  Escanea una etiqueta, un QR o sube un PDF para registrar tu café.
+<p style={{ marginTop: 8 }}>
+  Escanea la etiqueta de tu café para guardarlo en segundos.
+</p>
+
+<p style={{ marginTop: 4, fontSize: 13, opacity: 0.7 }}>
+  También puedes usar QR o subir un PDF.
 </p>
 
       {/* Input real (oculto) */}
@@ -109,16 +113,17 @@ export default function Home() {
   style={{
     marginTop: 12,
     width: "100%",
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
-    border: "1px solid #ccc",
+    border: "2px solid #111",
     fontWeight: 900,
-    background: "white",
+    background: "#f7f7f7",
     color: "#000",
+    fontSize: 16,
   }}
-  onClick={() => router.push("/scan")}
+  onClick={() => router.push("/vision")}
 >
-  Escanear QR →
+  📸 Escanear etiqueta
 </button>
 
 <button
@@ -132,9 +137,9 @@ export default function Home() {
     background: "white",
     color: "#000",
   }}
-  onClick={() => router.push("/vision")}
+  onClick={() => router.push("/scan")}
 >
-  Escanear etiqueta →
+  Escanear QR →
 </button>
 
       {/* Botón: Seleccionar / Cambiar PDF */}
