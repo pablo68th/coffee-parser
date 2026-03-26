@@ -347,11 +347,9 @@ export default function ConfirmPage() {
           <div>
             <strong>País:</strong> {displayCountry}
           </div>
-          {displayState ? (
-            <div>
-              <strong>Estado:</strong> {displayState}
-            </div>
-          ) : null}
+          <div>
+            <strong>Estado:</strong> {displayState || "—"}
+          </div>
           <div>
             <strong>Región:</strong> {displayRegion || "—"}
           </div>

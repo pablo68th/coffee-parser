@@ -326,11 +326,9 @@ setItems(merged);
                 <div>
                   <strong>País:</strong> {c.country || "—"}
                 </div>
-                {extractStateFromCoffee(c) ? (
-                  <div>
-                    <strong>Estado:</strong> {extractStateFromCoffee(c)}
-                  </div>
-                ) : null}
+                <div>
+                  <strong>Estado:</strong> {extractStateFromCoffee(c) || "—"}
+                </div>
                 <div>
                   <strong>Región:</strong> {cleanRegionForDisplay(c) || "—"}
                 </div>
