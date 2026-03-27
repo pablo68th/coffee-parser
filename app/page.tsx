@@ -123,7 +123,7 @@ export default function Home() {
   }}
   onClick={() => router.push("/vision")}
 >
-  📸 Escanear etiqueta
+  Escanear etiqueta → 
 </button>
 
 <button

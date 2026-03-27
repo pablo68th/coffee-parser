@@ -356,11 +356,16 @@ setItems(merged);
                         key={r}
                         onClick={() => updateRating(c.id, r)}
                         style={{
-                          padding: "6px 8px",
-                          borderRadius: 8,
+                          padding: c.rating_label === r ? "10px 12px" : "7px 9px",
+                          borderRadius: 10,
                           border: c.rating_label === r ? "2px solid #111" : "1px solid #ddd",
-                          background: "white",
+                          background: c.rating_label === r ? "#f7f7f7" : "white",
                           cursor: "pointer",
+                          fontSize: c.rating_label === r ? 20 : 16,
+                          fontWeight: c.rating_label === r ? 800 : 500,
+                          transform: c.rating_label === r ? "scale(1.08)" : "scale(1)",
+                          transition: "all 0.15s ease",
+                          opacity: c.rating_label === r ? 1 : 0.75,
                         }}
                       >
                         {r === "favorite" && "⭐"}

@@ -132,7 +132,7 @@ export default function VisionPage() {
             background: "white",
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#000" }}>
             Vista previa
           </div>
           <img
@@ -150,14 +150,12 @@ export default function VisionPage() {
 
       {loading && (
         <div
-          style={{
-            marginTop: 16,
-            border: "1px solid #ddd",
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 14,
-            background: "#fafafa",
-          }}
+         style={{
+              marginTop: 16,
+              fontSize: 13,
+              opacity: 0.7,
+              fontStyle: "italic",
+            }}
         >
           Analizando imagen y preparando datos para confirmar...
         </div>
@@ -180,52 +178,34 @@ export default function VisionPage() {
         </div>
       )}
 
-      {!!result && !loading && (
-        <div
-          style={{
-            marginTop: 16,
-            border: "1px solid #ddd",
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 12,
-            background: "#fafafa",
-          }}
-        >
-          Extracción completada. Redirigiendo a confirmación...
-        </div>
-      )}
+        {!!result && !loading && (
+          <p
+            style={{
+              marginTop: 16,
+              fontSize: 13,
+              opacity: 0.7,
+              fontStyle: "italic",
+            }}
+          >
+            Extracción completada. Redirigiendo a confirmación...
+          </p>
+        )}
 
-            <button
+      <button
         style={{
-          marginTop: 12,
+          marginTop: 10,
           width: "100%",
           padding: 12,
           borderRadius: 12,
-          border: "1px solid #eee",
+          border: "1px solid #ccc",
           fontWeight: 800,
           background: "white",
           color: "#000",
         }}
-        onClick={() => router.push("/library")}
+        onClick={() => router.push("/")}
       >
-        Ver biblioteca →
+        ← Home
       </button>
-
-<button
-  style={{
-    marginTop: 10,
-    width: "100%",
-    padding: 12,
-    borderRadius: 12,
-    border: "1px solid #ccc",
-    fontWeight: 800,
-    background: "white",
-    color: "#000",
-  }}
-  onClick={() => router.push("/")}
->
-  ← Home
-</button>
 
     </main>
     
