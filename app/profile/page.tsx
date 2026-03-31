@@ -10,6 +10,7 @@ type CoffeeRow = {
   id: string;
   coffee_name: string | null;
   country: string | null;
+  state?: string | null;
   process: string | null;
   region: string | null;
   varietal: string | null;
@@ -141,11 +142,14 @@ for (const r of rows) {
     if (!displayName.has(k)) displayName.set(k, prettyLabel(r.process));
   }
 
-  const derivedState = extractStateFromRow(r);
-  if (derivedState) {
-    const k = normalizeKey(derivedState);
+  const state =
+    (r.state && r.state.trim()) ||
+    extractStateFromRow(r);
+
+  if (state) {
+    const k = normalizeKey(state);
     inc(stateCounts, k);
-    if (!displayName.has(k)) displayName.set(k, prettyLabel(derivedState));
+    if (!displayName.has(k)) displayName.set(k, prettyLabel(state));
   }
 
   const cleanRegion = cleanRegionForDisplay(r);
@@ -316,7 +320,9 @@ function FavoritesSection(props: { rows: CoffeeRow[] }) {
                   {f.coffee_name || cleanRegionForDisplay(f) || "Café"}
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
-                  {extractStateFromRow(f) ? `${extractStateFromRow(f)} · ` : ""}
+                  {(f.state && f.state.trim()) || extractStateFromRow(f)
+                    ? `${(f.state && f.state.trim()) || extractStateFromRow(f)} · `
+                    : ""}
                   {cleanRegionForDisplay(f) || "—"}
                   {f.process ? ` · ${f.process}` : ""}
                   {f.varietal ? ` · ${f.varietal}` : ""}
