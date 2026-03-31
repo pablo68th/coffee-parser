@@ -8,6 +8,7 @@ type CoffeeItem = {
   id: string;
   coffee_name?: string;
   country?: string;
+  state?: string;
   region?: string;
   altitude_m?: number;
   process?: string;
@@ -39,6 +40,9 @@ const MEXICAN_STATES = [
 ];
 
 function extractStateFromCoffee(item: CoffeeItem) {
+  const savedState = (item.state || "").trim();
+  if (savedState) return savedState;
+
   const name = (item.coffee_name || "").trim();
   const region = (item.region || "").trim();
   const country = (item.country || "").trim();

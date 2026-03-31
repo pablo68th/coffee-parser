@@ -521,6 +521,7 @@ return `${originBase}${regionPart}${processPart}${qualifierPart}`.trim();
             .insert({
               user_id: user.id,
               coffee_name: displayCoffeeName ?? null,
+              state: displayState ?? null,
               region: displayRegion ?? null,
               country: (normalizedCountry ?? parsed.country) ?? null,
               altitude_m: parsed.altitude_m ?? null,
