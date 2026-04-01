@@ -36,7 +36,11 @@ export default function UrlPage() {
       }
 
       if (!res.ok) {
-        throw new Error(data?.error || "Falló extracción");
+        const extraDebug = data?.debug
+          ? `\n\nDEBUG:\n${JSON.stringify(data.debug, null, 2)}`
+          : "";
+
+        throw new Error((data?.error || "Falló extracción") + extraDebug);
       }
 
       const text = data.text || "";
