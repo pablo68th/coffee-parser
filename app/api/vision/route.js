@@ -21,7 +21,7 @@ export async function POST(req) {
 
     if (!process.env.OPENAI_API_KEY) {
       return Response.json(
-        { error: "Missing OPENAI_API_KEY in .env.local" },
+        { error: "Missing OPENAI_API_KEY in environment" },
         { status: 500 }
       );
     }
