@@ -319,14 +319,32 @@ setItems(merged);
             .reverse()
             .map((c: CoffeeItem) => (
               <div key={c.id} style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
-                <div style={{ fontWeight: 900 }}>
+                <div
+                  style={{
+                    fontWeight: 900,
+                    fontSize: 17,
+                    lineHeight: 1.3,
+                  }}
+                >
                   {c.coffee_name || (c.region ? `Café de ${c.region}` : "Café sin nombre")}
                 </div>
 
-                <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
-              <div>
-                <strong>Rating:</strong> {prettyRating(c.rating_label)}
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "inline-block",
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  border: "1px solid #ddd",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  background: "#f7f7f7",
+                }}
+              >
+                {prettyRating(c.rating_label)}
               </div>
+
+              <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6 }}>
                 <div>
                   <strong>País:</strong> {c.country || "—"}
                 </div>
@@ -351,8 +369,10 @@ setItems(merged);
               </div>
             </div>
 
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>Cambiar rating:</div>
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 12, opacity: 0.65, fontWeight: 700 }}>
+                      Cambiar rating
+                    </div>
 
                   <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                     {(["favorite", "liked", "neutral", "disliked"] as const).map((r) => (
