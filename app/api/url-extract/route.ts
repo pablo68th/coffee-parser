@@ -126,12 +126,19 @@ export async function POST(req: Request) {
       return Response.json({ error: "La URL debe empezar con http o https" }, { status: 400 });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return Response.json(
-        { error: "Missing OPENAI_API_KEY in environment" },
-        { status: 500 }
-      );
-    }
+if (!process.env.OPENAI_API_KEY) {
+  return Response.json(
+    {
+      error: "Missing OPENAI_API_KEY in environment",
+      debug: {
+        vercelEnv: process.env.VERCEL_ENV || null,
+        nodeEnv: process.env.NODE_ENV || null,
+        hasOpenAiKey: !!process.env.OPENAI_API_KEY,
+      },
+    },
+    { status: 500 }
+  );
+}
 
     const pageRes = await fetch(targetUrl.toString(), {
       method: "GET",
