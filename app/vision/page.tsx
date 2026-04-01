@@ -80,7 +80,11 @@ setCapturedImage(imageDataUrl);
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.error || "Error en Vision");
+        const extraDebug = data?.debug
+          ? `\n\nDEBUG:\n${JSON.stringify(data.debug, null, 2)}`
+          : "";
+
+        throw new Error((data?.error || "Falló la extracción con Vision") + extraDebug);
       }
 
       const text = data.text || "";

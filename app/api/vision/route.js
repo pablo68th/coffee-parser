@@ -19,12 +19,19 @@ export async function POST(req) {
       );
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return Response.json(
-        { error: "Missing OPENAI_API_KEY in environment" },
-        { status: 500 }
-      );
-    }
+if (!process.env.OPENAI_API_KEY) {
+  return Response.json(
+    {
+      error: "Missing OPENAI_API_KEY in environment",
+      debug: {
+        vercelEnv: process.env.VERCEL_ENV || null,
+        nodeEnv: process.env.NODE_ENV || null,
+        hasOpenAiKey: !!process.env.OPENAI_API_KEY,
+      },
+    },
+    { status: 500 }
+  );
+}
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
