@@ -280,22 +280,24 @@ export default function ConfirmPage() {
     );
   }
 
-  const isVisionScan = filename === "vision_scan";
+  const isStructuredScan =
+  filename === "vision_scan" || filename === "url_scan";
+  const isUrlScan = filename === "url_scan";
 
   const parsed: ConfirmParsed =
-    isVisionScan
+    isStructuredScan
       ? parseVisionJson(rawText) || {}
       : parseCoffeeFromText(rawText);
 
   const prettyRegion = regionFromFilename(filename);
 
-  const visionRegionParts = isVisionScan
+  const visionRegionParts = isStructuredScan
     ? splitVisionRegion(parsed.region)
     : { originFromRegion: undefined as string | undefined, cleanRegion: parsed.region || prettyRegion || "" };
 
   const normalizedCountry = normalizeCountry(parsed.country);
 
-  const stateFromParsed = isVisionScan && parsed.state && isMexicanState(parsed.state)
+  const stateFromParsed = isStructuredScan && parsed.state && isMexicanState(parsed.state)
     ? parsed.state
     : undefined;
 
@@ -305,12 +307,12 @@ export default function ConfirmPage() {
 
   const stateFromCoffeeName = findMexicanStateInText(parsed.coffee_name);
 
-  const fixedRegion = isVisionScan
+  const fixedRegion = isStructuredScan
     ? (visionRegionParts.cleanRegion || prettyRegion || "")
     : (parsed.region || prettyRegion || "");
 
   const fixedCoffeeName = (() => {
-    if (isVisionScan) {
+    if (isStructuredScan) {
       const normalizedState =
         stateFromParsed ||
         visionRegionParts.originFromRegion ||
@@ -329,12 +331,14 @@ export default function ConfirmPage() {
 
 const rawVisionName = (parsed.coffee_name || "").trim();
 
-const cleanedVisionName = cleanVisionQualifier({
-  rawVisionName,
-  state: normalizedState,
-  region: normalizedRegion,
-  process: parsed.process,
-});
+const cleanedVisionName = isUrlScan
+  ? ""
+  : cleanVisionQualifier({
+      rawVisionName,
+      state: normalizedState,
+      region: normalizedRegion,
+      process: parsed.process,
+    });
 
 const qualifierPart = cleanedVisionName ? ` — ${cleanedVisionName}` : "";
 
@@ -375,7 +379,7 @@ return `${originBase}${regionPart}${processPart}${qualifierPart}`.trim();
     fixedRegion || extractRegionFromDisplayName(fixedCoffeeName) || "";
 
   const displayCountry =
-    isVisionScan && (normalizedCountry === "México" || displayState)
+    isStructuredScan && (normalizedCountry === "México" || displayState)
       ? "México"
       : normalizedCountry || "—";
 

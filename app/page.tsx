@@ -142,10 +142,26 @@ export default function Home() {
   Escanear QR →
 </button>
 
+    <button
+      style={{
+        marginTop: 10,
+        width: "100%",
+        padding: 14,
+        borderRadius: 12,
+        border: "1px solid #ccc",
+        fontWeight: 900,
+        background: "white",
+        color: "#000",
+      }}
+      onClick={() => router.push("/url")}
+    >
+      Agregar desde URL →
+    </button>
+
       {/* Botón: Seleccionar / Cambiar PDF */}
       <button
         style={{
-          marginTop: 16,
+          marginTop: 10,
           width: "100%",
           padding: 14,
           borderRadius: 12,
